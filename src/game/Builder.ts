@@ -101,7 +101,7 @@ export class Builder {
   /** Restores a saved build, silently skipping anything no longer valid. */
   restore(placements: Placement[]): void {
     for (const p of placements) {
-      if (!PIECES[p.type] || this.left(p.type) <= 0) continue;
+      if (!PIECES[p.type]?.placeable || this.left(p.type) <= 0) continue;
       if (this.board.checkPlacement(p.type, p.at[0], p.at[1], p.at[2])) continue;
       this.board.add({ type: p.type, x: p.at[0], z: p.at[1], level: p.at[2], rot: ((p.rot % 4) + 4) % 4, fixed: false, props: p.state !== undefined ? { state: p.state } : {} });
     }

@@ -275,7 +275,7 @@ export const PIECES: Record<PieceType, PieceDef> = {
     ports: [{ dir: 2, dy: 0 }],
     paths: [{ a: W, b: { terminal: 'teleport' }, pts: westToCenter() }],
     occupancy: [0],
-    placeable: true,
+    placeable: false,
   }),
   launcher: def({
     type: 'launcher',
@@ -355,7 +355,6 @@ export const TOOL_ORDER: PieceType[] = [
   'switch',
   'gate',
   'launcher',
-  'teleporter',
   'magnet',
   'collector',
 ];

@@ -6,7 +6,7 @@ const ring = (cx: number, cz: number): [number, number][] => {
   return out;
 };
 
-/** World 4 — Energy. Portals, launchers, collectors and magnets. */
+/** World 4 — Energy. Fixed portal pairs, launchers, collectors and magnets. */
 export const WORLD4: LevelDef[] = [
   {
     id: 'w4-1',
@@ -15,27 +15,21 @@ export const WORLD4: LevelDef[] = [
     size: [7, 5],
     start: { at: [0, 2, 0], rot: 0 },
     goal: { at: [6, 2, 0], rot: 0 },
-    fixed: [0, 1, 2, 3].map((z) => ({ type: 'block' as const, at: [3, z, 0] as [number, number, number], props: { height: 3 } })),
-    inventory: { teleporter: 2, track: 5, curve: 4 },
-    par: 9,
-    challenge: { kind: 'pieces', max: 3 },
-    intro: 'Portals come in pairs. Roll into one and the sphere leaves the other at the same speed.',
-    hint: 'Place one Portal facing the start and its twin facing the goal, on the far side of the wall.',
+    fixed: [
+      ...[0, 1, 2, 3, 4].map((z) => ({ type: 'block' as const, at: [3, z, 0] as [number, number, number], props: { height: 3 } })),
+      { type: 'teleporter', at: [1, 4, 0], rot: 1 },
+      { type: 'teleporter', at: [5, 0, 0], rot: 3 },
+    ],
+    inventory: { track: 4, curve: 3 },
+    par: 6,
+    challenge: { kind: 'pieces', max: 4 },
+    intro: 'Portals come in pairs. Roll into one and the sphere leaves its twin — same speed, new place.',
+    hint: 'Steer the sphere into the near Portal, then catch it where the twin spits it out.',
     solution: [
       { type: 'curve', at: [1, 2, 0], rot: 0 },
       { type: 'track', at: [1, 3, 0], rot: 1 },
-      { type: 'curve', at: [1, 4, 0], rot: 2 },
-      { type: 'track', at: [2, 4, 0], rot: 0 },
-      { type: 'track', at: [3, 4, 0], rot: 0 },
-      { type: 'track', at: [4, 4, 0], rot: 0 },
-      { type: 'curve', at: [5, 4, 0], rot: 1 },
-      { type: 'track', at: [5, 3, 0], rot: 1 },
-      { type: 'curve', at: [5, 2, 0], rot: 3 },
-    ],
-    challengeSolution: [
-      { type: 'teleporter', at: [1, 2, 0], rot: 0 },
-      { type: 'teleporter', at: [4, 2, 0], rot: 2 },
-      { type: 'track', at: [5, 2, 0], rot: 0 },
+      { type: 'track', at: [5, 1, 0], rot: 1 },
+      { type: 'curve', at: [5, 2, 0], rot: 2 },
     ],
   },
   {
@@ -127,17 +121,20 @@ export const WORLD4: LevelDef[] = [
     size: [7, 5],
     start: { at: [0, 2, 4], rot: 0 },
     goal: { at: [6, 2, 0], rot: 0 },
-    fixed: [0, 1, 2, 3, 4].map((z) => ({ type: 'block' as const, at: [3, z, 0] as [number, number, number], props: { height: 6 } })),
-    inventory: { collector: 1, teleporter: 2, track: 3, curve: 2, ramp: 2 },
-    par: 6,
-    challenge: { kind: 'pieces', max: 4 },
-    intro: 'A tall tower, a solid wall. Catch the fall, then take a shortcut through space.',
-    hint: 'Collector first, then feed its output straight into a Portal.',
+    fixed: [
+      ...[0, 1, 2, 3, 4].map((z) => ({ type: 'block' as const, at: [3, z, 0] as [number, number, number], props: { height: 6 } })),
+      { type: 'teleporter', at: [2, 1, 0], rot: 3 },
+      { type: 'teleporter', at: [4, 3, 0], rot: 2 },
+    ],
+    inventory: { collector: 1, track: 3, curve: 2, ramp: 2 },
+    par: 4,
+    challenge: { kind: 'pieces', max: 3 },
+    intro: 'A tall tower, a solid wall. Catch the fall, then feed the Portal.',
+    hint: 'Put the Collector where the sphere lands and point its exit straight into the Portal.',
     solution: [
       { type: 'collector', at: [2, 2, 0], rot: 3 },
-      { type: 'teleporter', at: [2, 1, 0], rot: 3 },
-      { type: 'teleporter', at: [4, 2, 0], rot: 2 },
-      { type: 'track', at: [5, 2, 0], rot: 0 },
+      { type: 'curve', at: [5, 3, 0], rot: 1 },
+      { type: 'curve', at: [5, 2, 0], rot: 3 },
     ],
   },
   {
@@ -153,6 +150,8 @@ export const WORLD4: LevelDef[] = [
       { type: 'block', at: [5, 5, 0], props: { height: 3 } },
       { type: 'block', at: [6, 3, 0], props: { height: 3 } },
       { type: 'block', at: [7, 3, 0], props: { height: 3 } },
+      { type: 'teleporter', at: [4, 3, 0], rot: 1 },
+      { type: 'teleporter', at: [6, 4, 0], rot: 3 },
     ],
     voids: [
       [3, 0],
@@ -163,17 +162,15 @@ export const WORLD4: LevelDef[] = [
       [5, 1],
       [6, 1],
     ],
-    inventory: { launcher: 1, magnet: 1, teleporter: 2, track: 3, curve: 2 },
-    par: 6,
+    inventory: { launcher: 1, magnet: 1, track: 3, curve: 2 },
+    par: 4,
     challenge: { kind: 'time', seconds: 3.0 },
     intro: 'Launch, grab, warp. Three machines, one throw.',
-    hint: 'The Magnet can feed a Portal directly. Put the exit Portal inside the walled garden.',
+    hint: 'The Magnet can feed the Portal directly — catch the sphere right above it.',
     solution: [
       { type: 'track', at: [1, 1, 0], rot: 0 },
       { type: 'launcher', at: [2, 1, 0], rot: 0 },
       { type: 'magnet', at: [4, 2, 0], rot: 1 },
-      { type: 'teleporter', at: [4, 3, 0], rot: 1 },
-      { type: 'teleporter', at: [6, 4, 0], rot: 3 },
     ],
   },
 ];

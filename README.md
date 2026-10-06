@@ -37,9 +37,10 @@ npm run preview      # serve the production build
 - **Three-star system**: ★ reach the goal, ★★ stay within the part limit, ★★★ also beat the level's
   challenge. Challenges include time limits, collecting shards, passing through a ring, arriving gently,
   avoiding a component type, or using fewer parts.
-- **14 components**: Rail, Slope, Bend, Drop Shaft, Kicker, Booster, Brake, Splitter, Switch, Gate,
-  Launcher, Portal, Magnet and Collector. Levels can also use Pulse Gates, pillars, holes, energy shards
-  and checkpoint rings.
+- **13 placeable components**: Rail, Slope, Bend, Drop Shaft, Kicker, Booster, Brake, Splitter, Switch,
+  Gate, Launcher, Magnet and Collector. Levels can also contain fixed **Portal pairs**, Pulse Gates,
+  pillars, holes, energy shards and checkpoint rings. Portals are level-only so they can't be used to
+  skip the other mechanics.
 - **Smart construction**: pieces snap to the circuit automatically, picking the height and orientation
   that continue the energized rail (on average a player needs 0.1 rotations per placement). There is a
   live ghost preview with connection dots (green = connected, white = open, red = blocked), clear invalid
