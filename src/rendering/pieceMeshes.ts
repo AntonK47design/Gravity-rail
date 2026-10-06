@@ -360,19 +360,36 @@ export function buildPieceModel(type: PieceType, opts: PieceModelOpts = {}): { g
       break;
     }
     case 'launcher': {
-      const cradle = mesh(cached('cradle', () => new RoundedBoxGeometry(0.42, 0.16, 0.5, 2, 0.04)), stdMat(def.color, { rough: 0.45 }));
-      cradle.position.set(0.08, 0.17, 0);
-      group.add(cradle);
-      const barrel = mesh(cached('barrel', () => new THREE.CylinderGeometry(0.11, 0.14, 0.32, 18, 1, true)), stdMat(PALETTE.metal, { rough: 0.4 }));
-      barrel.position.set(0.18, 0.4, 0);
-      barrel.rotation.z = -0.82;
-      group.add(barrel);
-      const glow = glowMat(def.color, 0.6);
-      const ring = mesh(cached('barrelRing', () => new THREE.TorusGeometry(0.13, 0.025, 8, 24)), glow);
-      ring.position.set(0.3, 0.51, 0);
-      ring.rotation.y = Math.PI / 2;
-      ring.rotation.x = 0.82;
-      group.add(ring);
+      // A mortar: low base, side brackets, and a barrel tilted to the real launch
+      // angle (~45°) whose breech swallows the sphere at the cell centre.
+      const base = mesh(cached('lBase', () => new RoundedBoxGeometry(0.62, 0.1, 0.58, 2, 0.04)), stdMat(def.color, { rough: 0.45 }));
+      base.position.set(0, 0.14, 0);
+      group.add(base);
+      for (const z of [-0.25, 0.25]) {
+        const bracket = mesh(cached('lBracket', () => new RoundedBoxGeometry(0.26, 0.26, 0.05, 1, 0.02)), stdMat(def.color, { rough: 0.4 }));
+        bracket.position.set(0.02, 0.3, z);
+        group.add(bracket);
+        const pin = mesh(cached('lPin', () => new THREE.CylinderGeometry(0.04, 0.04, 0.07, 12)), stdMat(PALETTE.metal, { rough: 0.3, metal: 0.6 }));
+        pin.rotation.x = Math.PI / 2;
+        pin.position.set(0.02, 0.32, z * 1.1);
+        group.add(pin);
+      }
+      const turret = new THREE.Group();
+      turret.position.set(0, RAIL_Y, 0);
+      turret.rotation.z = -Math.PI / 4;
+      const barrel = mesh(cached('lBarrel', () => new THREE.CylinderGeometry(0.19, 0.215, 0.56, 28, 1, true)), new THREE.MeshStandardMaterial({ color: PALETTE.metal, roughness: 0.35, metalness: 0.6, side: THREE.DoubleSide }));
+      barrel.position.y = 0.16;
+      turret.add(barrel);
+      const breech = mesh(cached('lBreech', () => new THREE.TorusGeometry(0.215, 0.03, 10, 28)), stdMat(def.color, { rough: 0.4 }));
+      breech.rotation.x = Math.PI / 2;
+      breech.position.y = -0.1;
+      turret.add(breech);
+      const glow = glowMat(def.color, 0.7);
+      const muzzle = mesh(cached('lMuzzle', () => new THREE.TorusGeometry(0.19, 0.022, 10, 28)), glow);
+      muzzle.rotation.x = Math.PI / 2;
+      muzzle.position.y = 0.44;
+      turret.add(muzzle);
+      group.add(turret);
       anim.glow = glow;
       break;
     }
