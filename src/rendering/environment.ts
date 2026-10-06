@@ -1,5 +1,7 @@
 import * as THREE from 'three';
+import { GLOW_BLENDING } from './theme';
 import { PALETTE, glowTexture } from './materials';
+import { THEME } from './theme';
 
 /** Backdrop, lighting and ambient atmosphere. */
 export class Environment {
@@ -13,7 +15,7 @@ export class Environment {
 
   constructor(scene: THREE.Scene) {
     scene.background = new THREE.Color(PALETTE.bgBottom);
-    scene.fog = new THREE.Fog(PALETTE.bgBottom, 28, 70);
+    scene.fog = new THREE.Fog(PALETTE.bgBottom, THEME.fog[0], THEME.fog[1]);
 
     // Gradient sky dome
     const skyMat = new THREE.ShaderMaterial({
@@ -22,7 +24,7 @@ export class Environment {
       uniforms: {
         top: { value: new THREE.Color(PALETTE.bgTop) },
         bottom: { value: new THREE.Color(PALETTE.bgBottom) },
-        accent: { value: new THREE.Color(0x24315a) },
+        accent: { value: new THREE.Color(PALETTE.skyAccent) },
       },
       vertexShader: `varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
       fragmentShader: `uniform vec3 top; uniform vec3 bottom; uniform vec3 accent; varying vec3 vP;
@@ -34,10 +36,10 @@ export class Environment {
     this.sky.renderOrder = -10;
     scene.add(this.sky);
 
-    this.hemi = new THREE.HemisphereLight(0xc4d2ff, 0x262a3a, 1.2);
+    this.hemi = new THREE.HemisphereLight(THEME.lights.hemiSky, THEME.lights.hemiGround, THEME.lights.hemi);
     scene.add(this.hemi);
 
-    this.key = new THREE.DirectionalLight(0xfff1dd, 2.1);
+    this.key = new THREE.DirectionalLight(0xfff1dd, THEME.lights.key);
     this.key.position.set(-6, 12, 5);
     this.key.shadow.bias = -0.0004;
     this.key.shadow.normalBias = 0.02;
@@ -45,7 +47,7 @@ export class Environment {
     scene.add(this.key);
     scene.add(this.key.target);
 
-    this.rim = new THREE.DirectionalLight(0x8fb3ff, 0.9);
+    this.rim = new THREE.DirectionalLight(0x8fb3ff, THEME.lights.rim);
     this.rim.position.set(8, 5, -9);
     scene.add(this.rim);
 
@@ -62,7 +64,7 @@ export class Environment {
     const tex = new THREE.CanvasTexture(c);
     this.floor = new THREE.Mesh(
       new THREE.CircleGeometry(26, 48),
-      new THREE.MeshStandardMaterial({ color: 0x121826, roughness: 0.95, transparent: true, alphaMap: tex, depthWrite: false }),
+      new THREE.MeshStandardMaterial({ color: PALETTE.floor, roughness: 0.95, transparent: true, alphaMap: tex, depthWrite: false }),
     );
     this.floor.rotation.x = -Math.PI / 2;
     this.floor.position.y = -0.62;
@@ -83,7 +85,7 @@ export class Environment {
     dg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     this.dust = new THREE.Points(
       dg,
-      new THREE.PointsMaterial({ size: 0.09, map: glowTexture(), color: 0x8aa6ff, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending }),
+      new THREE.PointsMaterial({ size: 0.09, map: glowTexture(), color: PALETTE.dust, transparent: true, opacity: THEME.light ? 0.5 : 0.35, depthWrite: false, blending: GLOW_BLENDING }),
     );
     scene.add(this.dust);
   }

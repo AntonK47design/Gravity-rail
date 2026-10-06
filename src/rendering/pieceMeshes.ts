@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLOW_BLENDING } from './theme';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { CHANNEL_COLORS, PIECES, PieceType } from '../core/components';
 import { LEVEL_H, RAIL_Y, Vec3 } from '../core/grid';
@@ -20,7 +21,6 @@ export interface PieceAnim {
   channelMats?: THREE.MeshStandardMaterial[];
   beam?: THREE.Mesh;
   timerRing?: THREE.Mesh;
-  branchMats?: THREE.MeshStandardMaterial[];
   plate?: THREE.MeshStandardMaterial;
 }
 
@@ -33,6 +33,31 @@ const PROFILE: [number, number][] = [
   [-0.16, -0.165],
   [-0.16, -0.07],
   [-0.22, -0.07],
+];
+
+/**
+ * Splitter branches share one floor, so each branch keeps only its OUTER wall
+ * (the inner walls would cut through the other branch). Branch 0 turns left
+ * (outer wall on the right, +u); branch 1 turns right (outer wall on -u).
+ * Branch 1's floor sits a hair lower so the shared floor never z-fights.
+ */
+const SPLIT_PROFILES: [number, number][][] = [
+  [
+    [-0.16, -0.25],
+    [0.22, -0.25],
+    [0.22, -0.07],
+    [0.16, -0.07],
+    [0.16, -0.165],
+    [-0.16, -0.165],
+  ],
+  [
+    [-0.22, -0.25],
+    [0.16, -0.25],
+    [0.16, -0.167],
+    [-0.16, -0.167],
+    [-0.16, -0.07],
+    [-0.22, -0.07],
+  ],
 ];
 
 const geoCache = new Map<string, THREE.BufferGeometry>();
@@ -148,7 +173,8 @@ function addTile(group: THREE.Group, color: number, y = 0): THREE.MeshStandardMa
 
 function channel(type: PieceType, index: number, mat?: THREE.Material): THREE.Mesh {
   const def = PIECES[type];
-  const geo = cached(`ch:${type}:${index}`, () => sweep(def.paths[index].pts, PROFILE, type !== 'drop'));
+  const profile = type === 'splitter' ? SPLIT_PROFILES[index] : PROFILE;
+  const geo = cached(`ch:${type}:${index}`, () => sweep(def.paths[index].pts, profile, type !== 'drop'));
   return mesh(geo, mat ?? stdMat(PALETTE.rail, { rough: 0.45, metal: 0.05 }));
 }
 
@@ -200,24 +226,17 @@ export function buildPieceModel(type: PieceType, opts: PieceModelOpts = {}): { g
   if (type === 'block') {
     const h = Math.max(1, opts.height ?? 1) * LEVEL_H;
     const g = cached(`block:${h}`, () => new RoundedBoxGeometry(0.9, h, 0.9, 2, 0.05));
-    const b = mesh(g, stdMat(0x2c3548, { rough: 0.8 }));
+    const b = mesh(g, stdMat(PALETTE.block, { rough: 0.8 }));
     b.position.y = h / 2;
     group.add(b);
-    const cap = mesh(cached('blockcap', () => new RoundedBoxGeometry(0.7, 0.03, 0.7, 2, 0.01)), stdMat(0x3b475f, { rough: 0.6 }), false);
+    const cap = mesh(cached('blockcap', () => new RoundedBoxGeometry(0.7, 0.03, 0.7, 2, 0.01)), stdMat(PALETTE.blockCap, { rough: 0.6 }), false);
     cap.position.y = h + 0.01;
     group.add(cap);
     return { group, anim };
   }
 
   anim.plate = addTile(group, def.color);
-  def.paths.forEach((_, i) => {
-    if (type === 'splitter') {
-      const m = stdMat(PALETTE.rail, { rough: 0.32 }).clone();
-      anim.branchMats = anim.branchMats ?? [];
-      anim.branchMats.push(m);
-      group.add(channel(type, i, m));
-    } else group.add(channel(type, i));
-  });
+  def.paths.forEach((_, i) => group.add(channel(type, i)));
 
   switch (type) {
     case 'ramp': {
@@ -280,7 +299,7 @@ export function buildPieceModel(type: PieceType, opts: PieceModelOpts = {}): { g
     case 'timer': {
       const color = type === 'timer' ? def.color : chColor;
       for (const s of [-1, 1]) {
-        const post = mesh(cached('gatePost', () => new RoundedBoxGeometry(0.08, 0.56, 0.08, 1, 0.02)), stdMat(0x3a465e, { rough: 0.5 }));
+        const post = mesh(cached('gatePost', () => new RoundedBoxGeometry(0.08, 0.56, 0.08, 1, 0.02)), stdMat(PALETTE.metal, { rough: 0.5 }));
         post.position.set(0, 0.36, s * 0.27);
         group.add(post);
       }
@@ -344,7 +363,7 @@ export function buildPieceModel(type: PieceType, opts: PieceModelOpts = {}): { g
       const cradle = mesh(cached('cradle', () => new RoundedBoxGeometry(0.42, 0.16, 0.5, 2, 0.04)), stdMat(def.color, { rough: 0.45 }));
       cradle.position.set(0.08, 0.17, 0);
       group.add(cradle);
-      const barrel = mesh(cached('barrel', () => new THREE.CylinderGeometry(0.11, 0.14, 0.32, 18, 1, true)), stdMat(0x3a465e, { rough: 0.4 }));
+      const barrel = mesh(cached('barrel', () => new THREE.CylinderGeometry(0.11, 0.14, 0.32, 18, 1, true)), stdMat(PALETTE.metal, { rough: 0.4 }));
       barrel.position.set(0.18, 0.4, 0);
       barrel.rotation.z = -0.82;
       group.add(barrel);
@@ -405,7 +424,7 @@ export function buildPieceModel(type: PieceType, opts: PieceModelOpts = {}): { g
       const cup = mesh(cached('goalCup', () => new THREE.CylinderGeometry(0.2, 0.14, 0.06, 24)), stdMat(0xfff3c4, { rough: 0.3, emissive: 0xfde68a, emissiveIntensity: 0.6 }), false);
       cup.position.y = RAIL_Y - 0.19;
       group.add(cup);
-      const beamMat = new THREE.MeshBasicMaterial({ color: 0xfde68a, transparent: true, opacity: 0.35, alphaMap: beamTexture(), blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+      const beamMat = new THREE.MeshBasicMaterial({ color: 0xfde68a, transparent: true, opacity: 0.35, alphaMap: beamTexture(), blending: GLOW_BLENDING, depthWrite: false, side: THREE.DoubleSide });
       const beam = new THREE.Mesh(cached('beam', () => new THREE.CylinderGeometry(0.2, 0.3, 3.2, 24, 1, true)), beamMat);
       beam.position.y = RAIL_Y + 1.6;
       group.add(beam);

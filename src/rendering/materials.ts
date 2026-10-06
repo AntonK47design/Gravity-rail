@@ -1,25 +1,11 @@
 import * as THREE from 'three';
+import { GLOW_BLENDING, THEME } from './theme';
 
-/** Shared palette + material cache. All pieces reuse these to keep draw state small. */
+/** Shared palette (from the active theme) + material cache. Pieces reuse these to keep draw state small. */
 export const PALETTE = {
-  bgTop: 0x1a2236,
-  bgBottom: 0x07090f,
-  board: 0x1b2232,
-  boardEdge: 0x0f1420,
-  socket: 0x252e42,
-  socketLine: 0x2a3550,
-  rail: 0xc9d2e0,
-  railDark: 0xb7c2d4,
-  tile: 0x2c364c,
-  pillar: 0x3a465e,
+  ...THEME.palette,
   ball: 0x9ff3ff,
   ballCore: 0xffffff,
-  ghostOk: 0x7dd3fc,
-  ghostBad: 0xf87171,
-  portOpen: 0xe2e8f0,
-  portConnected: 0x4ade80,
-  portBlocked: 0xf87171,
-  select: 0xfde68a,
 };
 
 const cache = new Map<string, THREE.Material>();
@@ -50,7 +36,7 @@ export function additiveMat(color: number, opacity = 0.5): THREE.MeshBasicMateri
     color,
     transparent: true,
     opacity,
-    blending: THREE.AdditiveBlending,
+    blending: GLOW_BLENDING,
     depthWrite: false,
     side: THREE.DoubleSide,
   });

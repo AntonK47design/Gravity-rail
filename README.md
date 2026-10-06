@@ -1,8 +1,8 @@
-# ORBITAL
+# Gravity Rail
 
 **Build it. Start it. Watch the machine come alive.**
 
-ORBITAL is a 3D single-player physics construction puzzle for the browser. In each level you get a small
+Gravity Rail is a 3D single-player physics construction puzzle for the browser. In each level you get a small
 set of mechanical components. Place, rotate and connect them so that a glowing energy sphere rolls from
 **START** to the **GOAL**, then press **PLAY** and watch your machine run.
 
@@ -52,6 +52,29 @@ npm run preview      # serve the production build
   are no binary assets.
 - **Quality levels** (Auto, Low, Medium, High) cover shadows, pixel ratio, bloom and particle density.
   Auto picks a sensible default per device.
+
+## Shop, skins and daily rewards
+
+- **Gears** are the in-game currency. You earn them by clearing a level for the first time (+20), for
+  every new star (+10 each), and from the **daily reward**. The daily reward is a 7-day calendar
+  (30 → 200 Gears) that restarts if you miss a day.
+- The **Shop** (main menu, or click the Gears balance) sells eight sphere skins: Spark, Rose, Volt,
+  Ember, Gilded, Void, Comet and Prism. Each skin changes the sphere's colour, glow and trail. Skins are
+  purely cosmetic and never change the physics.
+- Saves from before the shop existed are credited with the Gears they would have earned.
+- The rules live in `src/meta/economy.ts` and the catalogue in `src/meta/skins.ts`. Both are covered by
+  `tests/economy.test.ts`.
+
+## Themes
+
+The look is chosen at build time with `VITE_THEME`:
+
+- **Midnight** (default, dark) is used by `npm run build` and the CrazyGames / Playgama builds.
+- **Porcelain** (white) is used by `npm run build:pages`, which is what GitHub Pages deploys.
+
+In dev you can preview it with `http://localhost:5173/?theme=porcelain`. Colours, lights and glow
+settings live in `src/rendering/theme.ts`, and the UI colours in the `[data-theme='porcelain']` block of
+`src/ui/styles.css`.
 
 ## Controls
 
@@ -171,8 +194,8 @@ The core game never depends on an external service. Midgame ads are requested on
 ### Building for a portal
 
 ```bash
-npm run build:crazygames   # → orbital-crazygames.zip (CrazyGames SDK v3 forced on)
-npm run build:playgama     # → orbital-playgama.zip   (Playgama Bridge forced on)
+npm run build:crazygames   # → gravity-rail-crazygames.zip (CrazyGames SDK v3 forced on)
+npm run build:playgama     # → gravity-rail-playgama.zip   (Playgama Bridge forced on)
 ```
 
 Each zip has `index.html` at its root and is ready to upload. On CrazyGames, open the developer portal,
@@ -180,7 +203,7 @@ submit a new HTML5 game with the zip, then use their preview / QA tool to check 
 
 ## Saving
 
-Progress is stored in `localStorage` (`orbital.save.v1`): unlocked levels (derived from completions),
+Progress is stored in `localStorage` (`gravityrail.save.v1`): unlocked levels (derived from completions),
 stars, best times, the last construction of every level, and all settings. If storage is unavailable,
 for example in private mode or a sandboxed iframe, the game runs from memory.
 
@@ -202,6 +225,6 @@ imported only when `import.meta.env.DEV` is true, so it is tree-shaken out of pr
 
 ## Credits & IP
 
-All code, models, music and sound in ORBITAL are original and generated procedurally for this project.
-ORBITAL is inspired by the general idea of marble-run construction toys, but it uses no third-party
+All code, models, music and sound in Gravity Rail are original and generated procedurally for this project.
+Gravity Rail is inspired by the general idea of marble-run construction toys, but it uses no third-party
 brand, asset, name or level layout.

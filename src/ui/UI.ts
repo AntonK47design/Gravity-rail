@@ -4,6 +4,15 @@ import type { UIActions } from './actions';
 import { el, escapeHtml, icon } from './dom';
 import { Hud } from './hud';
 import { ICON } from './icons';
+import { CURRENCY, DAILY_REWARDS, DailyStatus } from '../meta/economy';
+import type { Skin } from '../meta/skins';
+
+export interface ShopView {
+  coins: number;
+  owned: string[];
+  equipped: string;
+  skins: Skin[];
+}
 
 export interface WorldInfo {
   index: number;
@@ -27,6 +36,8 @@ export interface CompleteInfo {
   par: number;
   challenge: string;
   challengeMet: boolean;
+  /** Gears earned by this run. */
+  coins: number;
   newBest: boolean;
   hasNext: boolean;
   firstTime: boolean;
@@ -48,6 +59,8 @@ export class UI {
   private toastTimer = 0;
   private tipTimer = 0;
   private menuStars: HTMLSpanElement;
+  private walletEl: HTMLSpanElement;
+  private dailyDot: HTMLElement;
   private continueBtn: HTMLButtonElement;
   private worldTab = 0;
   modalOpen: string | null = null;
@@ -60,19 +73,31 @@ export class UI {
     this.menu = el('div', 'screen');
     this.menu.id = 'menu';
     this.menu.innerHTML = `
-      <h1 class="title">ORBITAL</h1>
+      <h1 class="title"><span>GRAVITY</span><span class="t2">RAIL</span></h1>
       <div class="tagline">Build it · Start it · Watch it come alive</div>
       <div class="menu-buttons"></div>
-      <div class="menu-foot"><span class="stars-total"><i>${ICON.star}</i><span></span></span></div>`;
+      <div class="menu-foot"><span class="stars-total"><i>${ICON.star}</i><span></span></span></div>
+      <div class="menu-corner"><button class="wallet-chip" title="${CURRENCY}"><i>${ICON.cog}</i><span>0</span></button><button class="icon-btn daily-btn" title="Daily reward">${ICON.gift}<b class="dot hidden"></b></button></div>`;
     const mb = this.menu.querySelector('.menu-buttons')!;
     this.continueBtn = this.button('Play', () => a.continueGame(), 'primary', ICON.play);
     mb.append(
       this.continueBtn,
       this.button('Levels', () => a.openLevels(), '', ICON.grid),
+      this.button('Shop', () => a.openShop(), '', ICON.bag),
       this.button('Settings', () => this.showSettings(), '', ICON.gear),
       this.button('How to play', () => this.showHowTo(), '', ICON.help),
     );
     this.menuStars = this.menu.querySelector('.stars-total span') as HTMLSpanElement;
+    this.walletEl = this.menu.querySelector('.wallet-chip span') as HTMLSpanElement;
+    this.dailyDot = this.menu.querySelector('.daily-btn .dot') as HTMLElement;
+    this.menu.querySelector('.wallet-chip')!.addEventListener('click', () => {
+      a.uiSound('click');
+      a.openShop();
+    });
+    this.menu.querySelector('.daily-btn')!.addEventListener('click', () => {
+      a.uiSound('click');
+      a.openDaily();
+    });
 
     this.select = el('div', 'screen');
     this.select.id = 'select';
@@ -111,6 +136,11 @@ export class UI {
     this.hud.show(screen === 'hud');
     this.menu.style.visibility = screen === 'menu' ? 'visible' : 'hidden';
     this.select.style.visibility = screen === 'select' ? 'visible' : 'hidden';
+  }
+
+  setWallet(coins: number, dailyAvailable: boolean): void {
+    this.walletEl.textContent = String(coins);
+    this.dailyDot.classList.toggle('hidden', !dailyAvailable);
   }
 
   setMenuInfo(totalStars: number, maxStars: number, continueLabel: string): void {
@@ -354,7 +384,8 @@ export class UI {
           'stats',
           `<div class="stat"><span>Time</span><span>${info.time.toFixed(2)}s${info.newBest && !info.firstTime ? '<span class="badge">BEST</span>' : ''}</span></div>
           <div class="stat"><span>Components</span><span>${info.used} / ${info.par} ${ok(info.used <= info.par)}</span></div>
-          <div class="stat"><span>${escapeHtml(info.challenge)}</span><span>${ok(info.challengeMet)}</span></div>`,
+          <div class="stat"><span>${escapeHtml(info.challenge)}</span><span>${ok(info.challengeMet)}</span></div>
+          ${info.coins > 0 ? `<div class="stat earned"><span>${CURRENCY} earned</span><span class="coins"><i>${ICON.cog}</i>+${info.coins}</span></div>` : ''}`,
         ),
       );
       const row = el('div', 'row');
@@ -378,6 +409,66 @@ export class UI {
     requestAnimationFrame(() => b.classList.add('show'));
     setTimeout(() => b.classList.remove('show'), 1900);
     setTimeout(() => b.remove(), 2600);
+  }
+
+  // ---------------------------------------------------------------- shop & daily
+
+  showShop(view: ShopView): void {
+    const scroll = this.modalOpen === 'shop' ? (this.modal.querySelector('.shop-grid') as HTMLElement | null)?.scrollTop ?? 0 : 0;
+    this.openModal('shop', (m) => {
+      m.appendChild(el('h2', '', 'Shop'));
+      const bar = el('div', 'shop-bar', `<span class="wallet-chip static"><i>${ICON.cog}</i><span>${view.coins}</span></span><span class="shop-note">Earn ${CURRENCY} by clearing levels, earning stars and claiming daily rewards.</span>`);
+      m.appendChild(bar);
+      const grid = el('div', 'shop-grid');
+      for (const s of view.skins) {
+        const owned = view.owned.includes(s.id);
+        const equipped = view.equipped === s.id;
+        const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
+        const card = el('div', `skin-card ${equipped ? 'equipped' : ''}`);
+        card.innerHTML = `<div class="swatch ${s.hueCycle ? 'prism' : ''}" style="--c:${hex(s.color)};--g:${hex(s.glow)};--t:${hex(s.trail)}"></div>
+          <div class="sk-name">${escapeHtml(s.name)}</div><div class="sk-blurb">${escapeHtml(s.blurb)}</div>`;
+        let btn: HTMLButtonElement;
+        if (equipped) {
+          btn = el('button', 'btn small', '<span>Equipped</span>') as HTMLButtonElement;
+          btn.disabled = true;
+        } else if (owned) {
+          btn = this.button('Equip', () => this.a.equipSkin(s.id), 'small');
+        } else {
+          btn = this.button(String(s.price), () => this.a.buySkin(s.id), `small buy ${view.coins < s.price ? 'poor' : 'primary'}`, ICON.cog);
+        }
+        card.appendChild(btn);
+        grid.appendChild(card);
+      }
+      m.appendChild(grid);
+      const row = el('div', 'row');
+      row.style.marginTop = '16px';
+      row.append(this.button('Daily reward', () => this.a.openDaily(), '', ICON.gift), this.button('Close', () => this.closeModal(), 'primary'));
+      m.appendChild(row);
+    });
+    requestAnimationFrame(() => {
+      const g = this.modal.querySelector('.shop-grid') as HTMLElement | null;
+      if (g) g.scrollTop = scroll;
+    });
+  }
+
+  showDaily(status: DailyStatus, streak: number, onClaim: () => void): void {
+    this.openModal('daily', (m) => {
+      m.appendChild(el('h2', '', 'Daily reward'));
+      const p = el('p', 'daily-note', status.available ? (status.reset ? 'Your streak restarted — come back every day to climb the calendar.' : 'Come back every day for bigger rewards.') : `Claimed! Streak: ${streak} day${streak === 1 ? '' : 's'}. Come back tomorrow.`);
+      m.appendChild(p);
+      const cal = el('div', 'daily-cal');
+      DAILY_REWARDS.forEach((r, i) => {
+        const claimed = status.available ? i < status.index : i <= status.index;
+        const today = i === status.index;
+        cal.appendChild(el('div', `day ${claimed ? 'claimed' : ''} ${today && status.available ? 'today' : ''} ${i === DAILY_REWARDS.length - 1 ? 'big' : ''}`, `<div class="dn">Day ${i + 1}</div><i>${claimed ? ICON.check : ICON.cog}</i><div class="dr">${r}</div>`));
+      });
+      m.appendChild(cal);
+      const row = el('div', 'row');
+      row.style.marginTop = '18px';
+      if (status.available) row.append(this.button(`Claim ${status.reward}`, onClaim, 'primary', ICON.gift));
+      row.append(this.button('Close', () => this.closeModal()));
+      m.appendChild(row);
+    });
   }
 
   // ---------------------------------------------------------------- toast / tips

@@ -16,6 +16,10 @@ export interface UIActions {
   resume(): void;
   restart(): void;
   rotateSelected(): void;
+  openShop(): void;
+  buySkin(id: string): void;
+  equipSkin(id: string): void;
+  openDaily(): void;
   moveSelected(): void;
   raiseSelected(dir: number): void;
   flipSelected(): void;

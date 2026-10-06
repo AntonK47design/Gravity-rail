@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLOW_BLENDING, THEME } from './theme';
 import { glowTexture } from './materials';
 
 /**
@@ -44,7 +45,8 @@ export class Effects {
         void main(){ vec4 t = texture2D(map, gl_PointCoord); gl_FragColor = vec4(vC * t.a, t.a); }`,
       transparent: true,
       depthWrite: false,
-      blending: THREE.AdditiveBlending,
+      blending: GLOW_BLENDING,
+      premultipliedAlpha: THEME.light,
     });
     this.points = new THREE.Points(g, mat);
     this.points.frustumCulled = false;
@@ -106,7 +108,7 @@ export class Effects {
     if (!r) {
       const mesh = new THREE.Mesh(
         new THREE.RingGeometry(0.42, 0.5, 48),
-        new THREE.MeshBasicMaterial({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
+        new THREE.MeshBasicMaterial({ transparent: true, blending: GLOW_BLENDING, depthWrite: false, side: THREE.DoubleSide }),
       );
       this.scene.add(mesh);
       r = { mesh, t: 0, dur, scale };

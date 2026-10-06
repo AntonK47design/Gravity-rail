@@ -30,7 +30,7 @@ export function installDebug(game: Game): void {
     panel.appendChild(b);
   };
   const title = document.createElement('div');
-  title.textContent = 'ORBITAL DEBUG';
+  title.textContent = 'GRAVITY RAIL DEBUG';
   title.style.cssText = 'font-weight:bold;color:#7ee8ff;margin-bottom:4px';
   panel.appendChild(title);
 
@@ -105,5 +105,5 @@ export function installDebug(game: Game): void {
       .join('\n');
   };
   (window as unknown as { game: Game }).game = game;
-  console.info('[orbital] debug tools ready — press ` to toggle');
+  console.info('[gravity-rail] debug tools ready — press ` to toggle');
 }

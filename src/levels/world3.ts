@@ -92,9 +92,9 @@ export const WORLD3: LevelDef[] = [
     voids: [[3, 1]],
     inventory: { curve: 4, track: 5, booster: 1 },
     par: 9,
-    challenge: { kind: 'time', seconds: 3.45 },
+    challenge: { kind: 'time', seconds: 4.0 },
     intro: 'Switches flip Splitters of the same colour too. Right now this one points into the void.',
-    hint: 'Visit the Switch first, then come back around into the Splitter. A Booster helps on long trips.',
+    hint: 'Visit the Switch first, then come back around into the Splitter. Boost on the way down to the Switch — that is the fast route.',
     solution: [
       { type: 'curve', at: [1, 0, 0], rot: 0 },
       { type: 'booster', at: [1, 1, 0], rot: 1 },

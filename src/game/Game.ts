@@ -18,6 +18,8 @@ import { Persistence, Settings } from '../save/persistence';
 import type { UIActions } from '../ui/actions';
 import { UI } from '../ui/UI';
 import { Builder } from './Builder';
+import { claimDaily, dailyStatus, dayKey, levelReward } from '../meta/economy';
+import { SKINS, skinById } from '../meta/skins';
 import { playEvents } from './feedback';
 
 type State = 'menu' | 'select' | 'build' | 'play' | 'complete';
@@ -53,6 +55,7 @@ export class Game implements UIActions, InputHandler {
   private hintShown = false;
   private guideActive = false;
   private worldTabFocus = 0;
+  private dailyOffered = false;
   /** Debug hooks (dev only). */
   onFrame: ((dt: number) => void) | null = null;
 
@@ -81,6 +84,7 @@ export class Game implements UIActions, InputHandler {
     };
     this.input = new InputController(canvas, this.r.cam, this, () => this.r.viewportHeight);
     this.applySettings(s);
+    this.ball.applySkin(skinById(save.data.skin));
 
     window.addEventListener('resize', () => this.onResize());
     window.addEventListener('orientationchange', () => setTimeout(() => this.onResize(), 200));
@@ -154,9 +158,15 @@ export class Game implements UIActions, InputHandler {
     this.ui.show('menu');
     const next = this.continueIndex();
     const total = this.save.totalStars();
+    this.refreshWallet();
     this.ui.setMenuInfo(total, LEVELS.length * 3, total === 0 && !this.save.level(LEVELS[0].id).completed ? 'Play' : `Continue · ${levelCode(LEVELS[next])}`);
     this.loadShowcase();
     this.audio.setIntensity(0.15);
+    // Offer the daily reward once per session, when one is waiting.
+    if (!this.dailyOffered && dailyStatus(this.save.data.daily, dayKey()).available) {
+      this.dailyOffered = true;
+      setTimeout(() => this.state === 'menu' && !this.ui.modalOpen && this.openDaily(), 900);
+    }
     this.platform.gameplayStop();
   }
 
@@ -345,8 +355,58 @@ export class Game implements UIActions, InputHandler {
 
   resetProgress(): void {
     this.save.reset();
+    this.ball.applySkin(skinById(this.save.data.skin));
     this.ui.toast('Progress reset.', 'info');
     this.showMenu();
+  }
+
+  // ================================================================ shop & daily
+
+  private refreshWallet(): void {
+    this.ui.setWallet(this.save.data.coins, dailyStatus(this.save.data.daily, dayKey()).available);
+  }
+
+  openShop(): void {
+    const d = this.save.data;
+    this.ui.showShop({ coins: d.coins, owned: d.skins, equipped: d.skin, skins: SKINS });
+  }
+
+  buySkin(id: string): void {
+    const skin = skinById(id);
+    if (skin.id !== id) return;
+    if (!this.save.buySkin(id, skin.price)) {
+      this.audio.sfx?.invalid();
+      this.ui.toast(`You need ${skin.price - this.save.data.coins} more Gears for ${skin.name}.`, 'bad');
+      return;
+    }
+    this.ball.applySkin(skin);
+    this.audio.sfx?.star(2);
+    this.ui.toast(`${skin.name} unlocked and equipped!`, 'info');
+    this.refreshWallet();
+    this.openShop();
+  }
+
+  equipSkin(id: string): void {
+    this.save.equipSkin(id);
+    this.ball.applySkin(skinById(this.save.data.skin));
+    this.audio.sfx?.rotate();
+    this.openShop();
+  }
+
+  openDaily(): void {
+    const today = dayKey();
+    const d = this.save.data.daily;
+    this.ui.showDaily(dailyStatus(d, today), d.streak, () => {
+      const r = claimDaily(this.save.data.daily, dayKey());
+      if (!r.reward) return;
+      this.save.data.daily = r.state;
+      this.save.addCoins(r.reward);
+      this.save.flush();
+      this.audio.sfx?.win();
+      this.ui.toast(`+${r.reward} Gears!`, 'info');
+      this.refreshWallet();
+      this.openDaily();
+    });
   }
 
   uiSound(kind: 'hover' | 'click'): void {
@@ -568,7 +628,9 @@ export class Game implements UIActions, InputHandler {
     const score = scoreRun(this.level, result);
     const prev = this.save.level(this.level.id);
     const firstTime = !prev.completed;
-    const { newBest } = this.save.recordResult(this.level.id, score.stars, sim.stats.time);
+    const { newBest, prevStars } = this.save.recordResult(this.level.id, score.stars, sim.stats.time);
+    const earned = levelReward(prevStars, score.stars, firstTime);
+    if (earned) this.save.addCoins(earned);
     this.completedThisSession++;
     if (score.stars === 3) this.platform.happyTime();
     const level = this.level;
@@ -587,6 +649,7 @@ export class Game implements UIActions, InputHandler {
           newBest,
           firstTime,
           hasNext: this.levelIndex < LEVELS.length - 1,
+          coins: earned,
         },
         (i) => {
           this.audio.sfx?.star(i);
@@ -594,7 +657,7 @@ export class Game implements UIActions, InputHandler {
         },
       );
       this.refreshHud();
-      if (this.levelIndex === LEVELS.length - 1) setTimeout(() => this.ui.toast('You built the Grand Machine. ORBITAL mastered — thank you for playing!', 'info', 6000), 1800);
+      if (this.levelIndex === LEVELS.length - 1) setTimeout(() => this.ui.toast('You built the Grand Machine. Gravity Rail mastered — thank you for playing!', 'info', 6000), 1800);
     }, 1300);
   }
 

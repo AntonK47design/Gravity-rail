@@ -1,8 +1,10 @@
 import * as THREE from 'three';
+import { GLOW_BLENDING, THEME } from './theme';
 import { BALL_R } from '../core/grid';
 import { PALETTE, glowTexture } from './materials';
+import { DEFAULT_SKIN, Skin, skinById } from '../meta/skins';
 
-const TRAIL = 48;
+const TRAIL = 240;
 
 /** The energy sphere: glowing core, halo, light and a fading light trail. */
 export class BallView {
@@ -19,6 +21,8 @@ export class BallView {
   private roll = new THREE.Quaternion();
   private t = 0;
   private energy = 1;
+  private skin: Skin = skinById(DEFAULT_SKIN);
+  private hue = new THREE.Color();
 
   constructor(scene: THREE.Scene) {
     this.shell = new THREE.Mesh(
@@ -27,7 +31,7 @@ export class BallView {
     );
     this.shell.castShadow = true;
     this.core = new THREE.Mesh(new THREE.IcosahedronGeometry(BALL_R * 1.04, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.25 }));
-    this.halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0x7ee8ff, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0x7ee8ff, transparent: true, opacity: 0.85, depthWrite: false, blending: GLOW_BLENDING }));
     this.halo.scale.setScalar(1.1);
     this.light = new THREE.PointLight(0x8beeff, 2.2, 3.2, 1.6);
     this.group.add(this.shell, this.core, this.halo, this.light);
@@ -47,12 +51,29 @@ export class BallView {
           void main(){ float a = texture2D(map, gl_PointCoord).a * vA * 0.7; gl_FragColor = vec4(color * a, a); }`,
         transparent: true,
         depthWrite: false,
-        blending: THREE.AdditiveBlending,
+        blending: GLOW_BLENDING,
+        premultipliedAlpha: THEME.light,
       }),
     );
     this.trail.frustumCulled = false;
     scene.add(this.trail);
     this.setVisible(false);
+  }
+
+  /** Swap the sphere's look (shop skins). Physics are unaffected. */
+  applySkin(skin: Skin): void {
+    this.skin = skin;
+    const shell = this.shell.material as THREE.MeshStandardMaterial;
+    shell.color.set(skin.color);
+    shell.emissive.set(skin.glow);
+    shell.metalness = skin.metalness;
+    shell.roughness = skin.roughness;
+    const cage = this.core.material as THREE.MeshBasicMaterial;
+    cage.color.set(skin.cage);
+    cage.opacity = skin.cageOpacity;
+    this.halo.material.color.set(skin.trail);
+    this.light.color.set(skin.trail);
+    (this.trail.material as THREE.ShaderMaterial).uniforms.color.value.set(skin.trail);
   }
 
   setViewportHeight(h: number): void {
@@ -93,7 +114,15 @@ export class BallView {
     this.energy += (target - this.energy) * Math.min(1, dt * 6);
     const s = Math.min(1, speed / 6);
     const pulse = 0.5 + 0.5 * Math.sin(this.t * 6);
-    (this.shell.material as THREE.MeshStandardMaterial).emissiveIntensity = (1.2 + s * 1.4 + pulse * 0.2) * this.energy;
+    const shell = this.shell.material as THREE.MeshStandardMaterial;
+    shell.emissiveIntensity = (1.2 + s * 1.4 + pulse * 0.2) * this.energy * this.skin.glowIntensity;
+    if (this.skin.hueCycle) {
+      this.hue.setHSL((this.t * 0.25) % 1, 0.9, 0.6);
+      shell.emissive.copy(this.hue);
+      this.halo.material.color.copy(this.hue);
+      this.light.color.copy(this.hue);
+      (this.trail.material as THREE.ShaderMaterial).uniforms.color.value.copy(this.hue);
+    }
     this.halo.material.opacity = (0.55 + s * 0.4) * this.energy;
     this.halo.scale.setScalar(0.9 + s * 0.5 + pulse * 0.05);
     this.light.intensity = (1.6 + s * 2.2) * this.energy;
@@ -105,7 +134,7 @@ export class BallView {
       this.trailAlpha[this.trailHead] = 0.35 + s * 0.65;
       this.lastTrail.copy(this.group.position);
     }
-    for (let i = 0; i < TRAIL; i++) this.trailAlpha[i] = Math.max(0, this.trailAlpha[i] - dt * 1.6);
+    for (let i = 0; i < TRAIL; i++) this.trailAlpha[i] = Math.max(0, this.trailAlpha[i] - (dt * 1.6) / this.skin.trailLength);
     const g = this.trail.geometry;
     (g.attributes.position as THREE.BufferAttribute).needsUpdate = true;
     (g.attributes.alpha as THREE.BufferAttribute).needsUpdate = true;

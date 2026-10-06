@@ -1,5 +1,7 @@
 import type { Placement } from '../core/level';
 import type { Quality } from '../rendering/Renderer';
+import { DailyState, REWARD } from '../meta/economy';
+import { DEFAULT_SKIN } from '../meta/skins';
 
 export interface LevelRecord {
   stars: number;
@@ -24,9 +26,18 @@ export interface SaveData {
   levels: Record<string, LevelRecord>;
   settings: Settings;
   seenIntro: boolean;
+  /** Gears balance. */
+  coins: number;
+  /** Owned skin ids. */
+  skins: string[];
+  /** Equipped skin id. */
+  skin: string;
+  daily: DailyState;
 }
 
-const KEY = 'orbital.save.v1';
+const KEY = 'gravityrail.save.v1';
+/** Saves from before the rename (when the game was called ORBITAL). */
+const LEGACY_KEYS = ['orbital.save.v1'];
 
 export const DEFAULT_SETTINGS: Settings = {
   music: 0.6,
@@ -39,7 +50,7 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 function fresh(): SaveData {
-  return { version: 1, levels: {}, settings: { ...DEFAULT_SETTINGS }, seenIntro: false };
+  return { version: 1, levels: {}, settings: { ...DEFAULT_SETTINGS }, seenIntro: false, coins: 0, skins: [DEFAULT_SKIN], skin: DEFAULT_SKIN, daily: { last: null, streak: 0 } };
 }
 
 /**
@@ -59,7 +70,7 @@ export class Persistence {
 
   private static probe(): boolean {
     try {
-      const k = '__orbital_probe__';
+      const k = '__gravityrail_probe__';
       window.localStorage.setItem(k, '1');
       window.localStorage.removeItem(k);
       return true;
@@ -75,15 +86,25 @@ export class Persistence {
   private load(): SaveData {
     if (!this.available) return fresh();
     try {
-      const raw = window.localStorage.getItem(KEY);
+      let raw = window.localStorage.getItem(KEY);
+      for (const k of LEGACY_KEYS) if (!raw) raw = window.localStorage.getItem(k);
       if (!raw) return fresh();
       const parsed = JSON.parse(raw) as Partial<SaveData>;
       if (!parsed || parsed.version !== 1) return fresh();
+      const levels: Record<string, LevelRecord> = typeof parsed.levels === 'object' && parsed.levels ? parsed.levels : {};
+      // Saves from before the shop existed get the Gears they would have earned.
+      const earned = Object.values(levels).reduce((n, r) => n + (r.completed ? REWARD.firstClear : 0) + (r.stars || 0) * REWARD.perStar, 0);
+      const skins = Array.isArray(parsed.skins) ? parsed.skins.filter((x): x is string => typeof x === 'string') : [];
+      if (!skins.includes(DEFAULT_SKIN)) skins.unshift(DEFAULT_SKIN);
       return {
         version: 1,
-        levels: typeof parsed.levels === 'object' && parsed.levels ? parsed.levels : {},
+        levels,
         settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
         seenIntro: !!parsed.seenIntro,
+        coins: typeof parsed.coins === 'number' && parsed.coins >= 0 ? Math.floor(parsed.coins) : earned,
+        skins,
+        skin: typeof parsed.skin === 'string' && skins.includes(parsed.skin) ? parsed.skin : DEFAULT_SKIN,
+        daily: parsed.daily && typeof parsed.daily.streak === 'number' ? parsed.daily : { last: null, streak: 0 },
       };
     } catch {
       return fresh();
@@ -124,6 +145,28 @@ export class Persistence {
     };
     this.save();
     return { newBest, prevStars };
+  }
+
+  addCoins(n: number): void {
+    this.data.coins = Math.max(0, Math.floor(this.data.coins + n));
+    this.save();
+  }
+
+  /** Buys a skin if affordable. Returns false (and changes nothing) otherwise. */
+  buySkin(id: string, price: number): boolean {
+    if (this.data.skins.includes(id)) return true;
+    if (this.data.coins < price) return false;
+    this.data.coins -= price;
+    this.data.skins.push(id);
+    this.data.skin = id;
+    this.flush();
+    return true;
+  }
+
+  equipSkin(id: string): void {
+    if (!this.data.skins.includes(id)) return;
+    this.data.skin = id;
+    this.save();
   }
 
   storeBuild(id: string, build: Placement[]): void {

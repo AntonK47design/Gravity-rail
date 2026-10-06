@@ -25,7 +25,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npm run build
+      # GitHub Pages gets the white "Porcelain" theme; portal builds stay dark.
+      - run: npm run build:pages
       - uses: actions/configure-pages@v5
         with:
           enablement: true

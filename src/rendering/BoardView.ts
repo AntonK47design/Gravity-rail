@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLOW_BLENDING } from './theme';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Board, Candidate, PlacedPiece } from '../core/board';
 import { CHANNEL_COLORS, PIECES, PieceType } from '../core/components';
@@ -47,7 +48,7 @@ export class BoardView {
   private carried: number | null = null;
   private guides = new THREE.Group();
   private guideGeo = new THREE.PlaneGeometry(0.8, 0.8);
-  private guideMat = additiveMat(0x7ee8ff, 0.25);
+  private guideMat = additiveMat(PALETTE.ghostOk, 0.25);
 
   constructor(scene: THREE.Scene) {
     scene.add(this.root);
@@ -104,7 +105,7 @@ export class BoardView {
     plate.position.set((w - 1) / 2, -0.25, (d - 1) / 2);
     plate.receiveShadow = true;
     this.base.add(plate);
-    const rim = new THREE.Mesh(new RoundedBoxGeometry(w + 0.62, 0.12, d + 0.62, 2, 0.05), stdMat(0x2a3550, { rough: 0.5, metal: 0.2 }));
+    const rim = new THREE.Mesh(new RoundedBoxGeometry(w + 0.62, 0.12, d + 0.62, 2, 0.05), stdMat(PALETTE.boardRim, { rough: 0.5, metal: 0.2 }));
     rim.position.set((w - 1) / 2, -0.44, (d - 1) / 2);
     this.base.add(rim);
 
@@ -114,8 +115,8 @@ export class BoardView {
     let i = 0;
     for (let x = 0; x < w; x++) for (let z = 0; z < d; z++) if (!board.isVoid(x, z)) socket.setMatrixAt(i++, m.makeTranslation(x, 0.0, z));
     if (voidCount) {
-      const pit = new THREE.InstancedMesh(new THREE.BoxGeometry(1.0, 0.04, 1.0), new THREE.MeshBasicMaterial({ color: 0x030408 }), voidCount);
-      const glow = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.98, 0.98), additiveMat(0x3b2a6b, 0.25), voidCount);
+      const pit = new THREE.InstancedMesh(new THREE.BoxGeometry(1.0, 0.04, 1.0), new THREE.MeshBasicMaterial({ color: PALETTE.pit }), voidCount);
+      const glow = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.98, 0.98), additiveMat(PALETTE.pitGlow, 0.25), voidCount);
       let j = 0;
       for (const key of board.voids) {
         const [vx, vz] = key.split(',').map(Number);
@@ -132,7 +133,7 @@ export class BoardView {
     this.shards = shards.map((p) => {
       const s = new THREE.Mesh(new THREE.OctahedronGeometry(0.11), glowMat(0xf0abfc, 1.6));
       s.position.set(p.x, p.y, p.z);
-      const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xf0abfc, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending }));
+      const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xf0abfc, transparent: true, opacity: 0.6, depthWrite: false, blending: GLOW_BLENDING }));
       halo.scale.setScalar(0.6);
       s.add(halo);
       this.base.add(s);
@@ -245,7 +246,7 @@ export class BoardView {
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
-    return new THREE.Points(g, new THREE.PointsMaterial({ color, size: 0.16, map: glowTexture(), transparent: true, opacity: 0.95, depthWrite: false, blending: THREE.AdditiveBlending }));
+    return new THREE.Points(g, new THREE.PointsMaterial({ color, size: 0.16, map: glowTexture(), transparent: true, opacity: 0.95, depthWrite: false, blending: GLOW_BLENDING }));
   }
 
   // ---------------------------------------------------------------- ghost
@@ -284,7 +285,7 @@ export class BoardView {
     // Arc child is built in local space at rot 0 — counter its rotation by rebuilding as needed.
     // Port indicators
     while (this.portDots.length < c.ports.length) {
-      const d = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      const d = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8), new THREE.MeshBasicMaterial({ color: PALETTE.portOpen }));
       this.portDots.push(d);
       this.root.add(d);
     }
@@ -487,10 +488,6 @@ export class BoardView {
         const branch = sim ? sim.splitterBranch(p) : (p.props.state ?? 0);
         const target = branch === 0 ? 0.55 : -0.55;
         if (a.flipper) a.flipper.rotation.y += (target - a.flipper.rotation.y) * 0.2;
-        a.branchMats?.forEach((m, i) => {
-          m.emissive.set(PIECES.splitter.color);
-          m.emissiveIntensity = i === branch ? 0.35 : 0;
-        });
         break;
       }
       case 'teleporter':

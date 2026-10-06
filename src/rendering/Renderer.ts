@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { CameraController } from './camera';
 import { Environment } from './environment';
+import { THEME } from './theme';
 
 export type Quality = 'low' | 'medium' | 'high';
 
@@ -60,7 +61,7 @@ export class Renderer {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: this.profile.antialias, powerPreference: 'high-performance', alpha: false });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.92;
+    this.renderer.toneMappingExposure = THEME.lights.exposure;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
     this.cam = new CameraController(this.camera);
@@ -72,6 +73,7 @@ export class Renderer {
   applyQuality(q: Quality): void {
     this.quality = q;
     this.profile = qualityProfile(q);
+    if (!THEME.bloom) this.profile.bloom = false;
     this.renderer.setPixelRatio(this.profile.pixelRatio);
     this.renderer.shadowMap.enabled = this.profile.shadows;
     this.env.setShadows(this.profile.shadows, this.profile.shadowMapSize);

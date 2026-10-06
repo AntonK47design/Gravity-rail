@@ -14,7 +14,7 @@ async function boot(): Promise<void> {
     game = new Game(canvas, platform, save);
   } catch (e) {
     console.error(e);
-    if (loader) loader.innerHTML = '<div class="ld-err">ORBITAL needs WebGL to run.<br/>Please try another browser or device.</div>';
+    if (loader) loader.innerHTML = '<div class="ld-err">Gravity Rail needs WebGL to run.<br/>Please try another browser or device.</div>';
     return;
   }
   game.start();
@@ -30,4 +30,4 @@ async function boot(): Promise<void> {
   window.addEventListener('pagehide', () => save.flush());
 }
 
-boot().catch((e) => console.error('[orbital] boot failed', e));
+boot().catch((e) => console.error('[gravity-rail] boot failed', e));
