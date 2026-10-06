@@ -60,7 +60,7 @@ export const WORLD1: LevelDef[] = [
     par: 6,
     challenge: { kind: 'shards' },
     shards: [[3, 2, 0]],
-    intro: 'Bends turn the sphere. Press R to rotate a piece before placing it.',
+    intro: 'Bends turn the sphere. Pieces snap onto the rail — rotate them (R or the ⟳ button) if needed.',
     hint: 'Two Bends make a staircase: turn south, roll, then turn east into the goal.',
     solution: [
       { type: 'curve', at: [1, 0, 0], rot: 0 },

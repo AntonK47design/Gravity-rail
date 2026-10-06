@@ -34,6 +34,8 @@ export class Hud {
   private tools: ToolState[] = [];
   private activeTool: PieceType | null = null;
   private pulseTool: PieceType | null = null;
+  /** Shows the full goal list (on narrow screens the pills are icon-only). */
+  onGoalsTap: (() => void) | null = null;
 
   constructor(parent: HTMLElement, private a: UIActions) {
     this.root = el('div', '');
@@ -44,6 +46,10 @@ export class Hud {
     const pause = this.iconBtn(ICON.pause, 'Pause (Esc)', () => a.pause());
     this.title = el('div', 'hud-title panel interactive');
     this.goals = el('div', 'hud-goals panel interactive');
+    this.goals.addEventListener('click', () => {
+      this.a.uiSound('click');
+      this.onGoalsTap?.();
+    });
     const right = el('div', 'hud-right');
     const hint = this.iconBtn(ICON.hint, 'Hint', () => a.hint());
     hint.classList.add('build-only');

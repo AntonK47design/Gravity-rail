@@ -30,6 +30,8 @@ export class Builder {
   toolRot = 0;
   selected: number | null = null;
   unlimited = false;
+  /** Pieces currently connected to the start (from the circuit trace). */
+  energized = new Set<number>();
   private candList: Candidate[] = [];
   private candIdx = 0;
   private candCell = '';
@@ -151,7 +153,7 @@ export class Builder {
       if (L === 0) floorCell = [cx, cz];
       if (!this.board.inBounds(cx, cz)) continue;
       const list = this.board
-        .candidates(tool, cx, cz, L, this.toolRot)
+        .candidates(tool, cx, cz, L, this.toolRot, undefined, this.energized)
         .filter((c) => c.level <= L && c.level >= L - 2)
         .map((c) => ({ ...c, score: c.score - (c.connections === 0 ? c.level * 3 : 0) }));
       list.sort((a, b) => b.score - a.score);

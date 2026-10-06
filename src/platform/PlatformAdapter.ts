@@ -35,7 +35,7 @@ export class LocalPlatform implements PlatformAdapter {
 }
 
 /** Loads an external SDK script with a timeout. Never throws. */
-export function loadScript(src: string, timeoutMs = 6000): Promise<boolean> {
+export function loadScript(src: string, timeoutMs = 4000): Promise<boolean> {
   return new Promise((resolve) => {
     try {
       const s = document.createElement('script');

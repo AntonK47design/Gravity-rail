@@ -371,6 +371,15 @@ export class UI {
     });
   }
 
+  /** Large cinematic title shown when entering a new world. */
+  banner(kicker: string, title: string): void {
+    const b = el('div', 'banner', `<div class="bk">${escapeHtml(kicker)}</div><div class="bt">${escapeHtml(title)}</div>`);
+    this.root.appendChild(b);
+    requestAnimationFrame(() => b.classList.add('show'));
+    setTimeout(() => b.classList.remove('show'), 1900);
+    setTimeout(() => b.remove(), 2600);
+  }
+
   // ---------------------------------------------------------------- toast / tips
 
   toast(text: string, kind: 'info' | 'bad' | 'hint' = 'info', ms = 2800): void {

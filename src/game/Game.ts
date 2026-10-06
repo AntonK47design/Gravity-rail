@@ -75,6 +75,10 @@ export class Game implements UIActions, InputHandler {
     });
     this.ui = new UI(this);
     this.ui.settings = s;
+    this.ui.hud.onGoalsTap = () => {
+      const l = this.level;
+      this.ui.toast(`★ Reach the goal · ★★ ${l.par} parts or fewer · ★★★ ${challengeText(l)}`, 'hint', 4500);
+    };
     this.input = new InputController(canvas, this.r.cam, this, () => this.r.viewportHeight);
     this.applySettings(s);
 
@@ -420,7 +424,12 @@ export class Game implements UIActions, InputHandler {
     this.ui.hud.setPlaying(false);
     this.refreshHud();
     this.onBuildChanged();
-    if (level.intro) setTimeout(() => this.state === 'build' && this.level === level && this.ui.toast(level.intro!, 'hint', 5200), 450);
+    const firstOfWorld = LEVELS.findIndex((l) => l.world === level.world) === index;
+    if (firstOfWorld) {
+      const w = WORLDS.find((x) => x.index === level.world);
+      if (w) this.ui.banner(`WORLD ${w.index}`, w.name.toUpperCase());
+    }
+    if (level.intro) setTimeout(() => this.state === 'build' && this.level === level && this.ui.toast(level.intro!, 'hint', 5200), firstOfWorld ? 2000 : 450);
     this.audio.setIntensity(0.3);
     this.platform.gameplayStart();
   }
@@ -436,6 +445,7 @@ export class Game implements UIActions, InputHandler {
       this.lastVersion = this.board.version;
       const tr = traceFromStart(this.board);
       this.view.setEnergized(tr.energized, tr.complete);
+      this.builder.energized = tr.energized;
       this.view.sync();
       this.ui.hud.setReady(tr.complete && this.state === 'build');
       if (this.state === 'build') this.save.storeBuild(this.level.id, this.builder.placements());
@@ -460,7 +470,7 @@ export class Game implements UIActions, InputHandler {
   }
 
   refreshHud(): void {
-    if (this.state !== 'build' && this.state !== 'play') return;
+    if (this.state !== 'build' && this.state !== 'play' && this.state !== 'complete') return;
     const rec = this.save.level(this.level.id);
     this.ui.hud.setTools(this.builder.tools(), this.builder.tool);
     this.ui.hud.setGoals({ used: this.builder.usedCount(), par: this.level.par, challenge: challengeText(this.level), best: rec.stars });
@@ -544,6 +554,9 @@ export class Game implements UIActions, InputHandler {
     setTimeout(() => this.fx.ring(gp, 0xffffff, 1.6, 0.6), 160);
     this.view.flash(goal.id);
     this.ball.pop(1.8);
+    // Draw the eye to the goal for the celebration.
+    this.r.cam.follow(new THREE.Vector3(gp.x, gp.y, gp.z), 0.45);
+    this.r.cam.zoom(0.88);
 
     const placements = this.builder.placements();
     const result = { won: true, stats: sim.stats, piecesUsed: placements.length, typesUsed: new Set(placements.map((p) => p.type)) };
@@ -576,6 +589,7 @@ export class Game implements UIActions, InputHandler {
         },
       );
       this.refreshHud();
+      if (this.levelIndex === LEVELS.length - 1) setTimeout(() => this.ui.toast('You built the Grand Machine. ORBITAL mastered — thank you for playing!', 'info', 6000), 1800);
     }, 1300);
   }
 
@@ -585,6 +599,10 @@ export class Game implements UIActions, InputHandler {
     this.audio.sfx?.setRoll(0, false);
     this.failCount++;
     this.ui.toast(FAIL_TEXT[sim.failReason ?? 'fell'], 'bad', 2600);
+    // Mark where it went wrong so the player can see why.
+    const fp = { x: sim.pos.x, y: Math.max(0.05, sim.pos.y - 0.1), z: sim.pos.z };
+    this.fx.ring(fp, 0xf87171, 1.4, 0.7);
+    setTimeout(() => this.fx.ring(fp, 0xf87171, 1.0, 0.6), 250);
     if (sim.failReason === 'crash' || sim.failReason === 'fell') this.r.cam.shake(0.04);
     if (this.failCount >= 2 && !this.hintShown && this.level.hint && this.save.data.settings.hints) {
       this.hintShown = true;

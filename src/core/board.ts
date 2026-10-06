@@ -300,13 +300,35 @@ export class Board {
     return 'open';
   }
 
-  evaluate(type: PieceType, x: number, z: number, level: number, rot: number, ignoreId?: number): Candidate {
+  /** Piece id on the other side of a hypothetical port, if it connects. */
+  private partnerAt(x: number, z: number, dir: number, height: number, selfId?: number): number | undefined {
+    const list = this.portMap.get(edgeKey(x, z, dir, height));
+    return list?.find((q) => q.pieceId !== selfId && q.dir === oppositeDir(dir))?.pieceId;
+  }
+
+  evaluate(type: PieceType, x: number, z: number, level: number, rot: number, ignoreId?: number, energized?: Set<number>): Candidate {
     const error = this.checkPlacement(type, x, z, level, {}, ignoreId);
-    const ports = computePorts({ type, x, z, level, rot }).map((port) => ({
+    const raw = computePorts({ type, x, z, level, rot });
+    const ports = raw.map((port) => ({
       pos: port.pos,
       dir: port.dir,
       status: this.portStatus(x, z, port.dir, port.height, ignoreId),
     }));
+    // Flow bias: continue the energized circuit, preferably downhill and with
+    // directional pieces facing away from where the sphere comes from.
+    let flow = 0;
+    if (energized?.size) {
+      const maxH = Math.max(...raw.map((p) => p.height));
+      const minH = Math.min(...raw.map((p) => p.height));
+      raw.forEach((port, i) => {
+        const partner = this.partnerAt(x, z, port.dir, port.height, ignoreId);
+        if (partner === undefined || !energized.has(partner)) return;
+        flow += 3;
+        if (maxH > minH && port.height === maxH) flow += 2;
+        if (FLOW_INPUT_FIRST.has(type) && i === 0) flow += 2;
+        if (FLOW_OUTPUT_FIRST.has(type) && i === 0) flow -= 3;
+      });
+    }
     const connections = ports.filter((p) => p.status === 'connected').length;
     const blocked = ports.filter((p) => p.status === 'blocked').length;
     return {
@@ -318,7 +340,7 @@ export class Board {
       error: error ?? undefined,
       connections,
       ports,
-      score: connections * 10 - blocked * 4,
+      score: connections * 10 - blocked * 4 + flow,
     };
   }
 
@@ -326,12 +348,12 @@ export class Board {
    * Smart placement: rank every (level, rotation) for a cell, favouring
    * placements that connect to existing open ports.
    */
-  candidates(type: PieceType, x: number, z: number, preferLevel: number, preferRot: number, ignoreId?: number): Candidate[] {
+  candidates(type: PieceType, x: number, z: number, preferLevel: number, preferRot: number, ignoreId?: number, energized?: Set<number>): Candidate[] {
     const out: Candidate[] = [];
     if (!this.inBounds(x, z)) return out;
     for (let level = 0; level <= this.maxLevel; level++) {
       for (let rot = 0; rot < 4; rot++) {
-        const c = this.evaluate(type, x, z, level, rot, ignoreId);
+        const c = this.evaluate(type, x, z, level, rot, ignoreId, energized);
         if (!c.valid) continue;
         c.score += rot === preferRot ? 1.5 : 0;
         c.score -= Math.abs(level - preferLevel) * 1.2;
@@ -368,6 +390,11 @@ export class Board {
     return [...this.pieces.values()].filter((p) => !p.fixed);
   }
 }
+
+/** Pieces whose port 0 is where the sphere should come in. */
+const FLOW_INPUT_FIRST = new Set<PieceType>(['booster', 'launcher', 'kicker', 'teleporter', 'splitter', 'drop']);
+/** Pieces whose port 0 is an output (never the input from the circuit). */
+const FLOW_OUTPUT_FIRST = new Set<PieceType>(['magnet', 'collector']);
 
 /** Pieces whose behaviour depends on direction even when the port layout is symmetric. */
 const PIECE_DIRECTIONAL = new Set<PieceType>(['booster', 'launcher', 'kicker', 'teleporter', 'magnet', 'collector']);
