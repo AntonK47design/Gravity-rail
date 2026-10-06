@@ -273,7 +273,7 @@ export class Game implements UIActions, InputHandler {
   }
 
   rotateSelected(): void {
-    this.builder.rotate();
+    this.builder.rotatePiece();
   }
   raiseSelected(dir: number): void {
     this.builder.raise(dir);
@@ -400,13 +400,14 @@ export class Game implements UIActions, InputHandler {
     const markers = levelMarkers(level);
     this.view.setLevel(board, markers.shards, markers.checkpoint);
     this.view.buildMode = true;
-    this.ball.setVisible(false);
+    this.showIdleBall();
     this.fx.clear();
     const box = this.view.bounds();
     this.r.env.fit(box);
     this.r.cam.autoOrbit = 0;
     this.r.cam.follow(null);
     this.r.cam.frame(box, true);
+    this.r.cam.flyIn();
     this.state = 'build';
     this.paused = false;
     this.failCount = 0;
@@ -501,10 +502,23 @@ export class Game implements UIActions, InputHandler {
     if (this.save.data.settings.follow) this.r.cam.follow(this.ball.group.position, 0.3);
   }
 
+  /** In build mode the sphere rests, softly pulsing, on the START pad. */
+  private showIdleBall(): void {
+    const start = [...this.board.pieces.values()].find((p) => p.type === 'start');
+    if (!start) return this.ball.setVisible(false);
+    const path = this.board.pathsOf(start.id)[0];
+    const p = path.pts[1] ?? path.pts[0];
+    this.idleBall.set(p.x, p.y, p.z);
+    this.ball.reset(p);
+    this.ball.setVisible(true);
+  }
+
+  private idleBall = new THREE.Vector3();
+
   stopRun(silent = false): void {
     if (!this.sim && this.state !== 'play') return;
     this.sim = null;
-    this.ball.setVisible(false);
+    this.showIdleBall();
     this.view.buildMode = true;
     this.view.resetMarkers();
     this.r.cam.follow(null);
@@ -618,6 +632,7 @@ export class Game implements UIActions, InputHandler {
         if (this.showcaseRestart > 2.4) this.newShowcaseRun();
       }
     }
+    if (this.state === 'build' && !this.sim) this.ball.update(dt, this.idleBall, 0, 0.45);
     this.ball.relax(dt);
     this.view.update(dt, this.sim);
     this.fx.update(dt);
@@ -632,6 +647,7 @@ export class Game implements UIActions, InputHandler {
     const p = this.builder.selectedPiece();
     if (!p) {
       this.ui.hud.hideBubble();
+      this.tipFor = -1;
       return;
     }
     const wp = this.view.pieceWorldPos(p.id);
@@ -641,8 +657,11 @@ export class Game implements UIActions, InputHandler {
     const x = rect.left + ((v.x + 1) / 2) * rect.width;
     const y = rect.top + ((1 - v.y) / 2) * rect.height - 10;
     this.ui.hud.showBubble(x, y, { label: PIECES[p.type].name, fixed: p.fixed, canFlip: p.type === 'splitter' && !p.fixed });
-    if (p.fixed) this.ui.tip(`<b>${PIECES[p.type].name}</b> — ${PIECES[p.type].blurb}`, 2500);
+    if (p.fixed && this.tipFor !== p.id) this.ui.tip(`<b>${PIECES[p.type].name}</b> — ${PIECES[p.type].blurb}`, 3000);
+    this.tipFor = p.id;
   }
+
+  private tipFor = -1;
 
   // ================================================================ input
 
@@ -664,6 +683,8 @@ export class Game implements UIActions, InputHandler {
 
   private onKey(e: KeyboardEvent): void {
     if (e.target instanceof HTMLInputElement) return;
+    // Keyboard shortcuts must never also "click" a focused HUD button.
+    if (document.activeElement instanceof HTMLButtonElement && !this.ui.modalOpen) document.activeElement.blur();
     const k = e.key;
     if (k === 'Escape') {
       if (this.ui.modalOpen) {
@@ -694,6 +715,7 @@ export class Game implements UIActions, InputHandler {
         break;
       case 'delete':
       case 'backspace':
+        e.preventDefault();
         if (build) this.builder.remove();
         break;
       case 'z':

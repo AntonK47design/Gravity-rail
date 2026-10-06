@@ -220,7 +220,7 @@ export class Builder {
     const hitId = this.pickPiece(ndc);
     if (this.tool) {
       if (touch && hitId !== null) {
-        this.select(hitId);
+        this.select(hitId, true);
         return;
       }
       const c = this.currentCandidate(ndc, touch);
@@ -256,17 +256,18 @@ export class Builder {
     for (const port of c.ports) if (port.status === 'connected') this.fx.burst(port.pos, 0x4ade80, 6, 0.8, 0.08, 0.4);
     this.candCell = '';
     if (this.left(type) <= 0) this.tool = null;
-    if (selectAfter) this.select(piece.id);
+    // Touch: keep the tool armed for rapid tapping; the bubble edits the piece just placed.
+    if (selectAfter) this.select(piece.id, true);
     this.fb.changed();
     this.refreshHover();
   }
 
   // ---------------------------------------------------------------- selection editing
 
-  select(id: number | null): void {
+  select(id: number | null, keepTool = false): void {
     this.selected = id;
     this.view.select(id);
-    if (id !== null) {
+    if (id !== null && !keepTool) {
       this.tool = null;
       this.view.showGhost(null, null);
     }
@@ -286,7 +287,7 @@ export class Builder {
 
   /** R: cycles placement candidates while placing, or rotates the selected piece. */
   rotate(): void {
-    if (this.tool) {
+    if (this.tool && (this.selected === null || this.hoverNdc)) {
       if (this.candList.length > 1) {
         this.candIdx = (this.candIdx + 1) % this.candList.length;
         this.toolRot = this.candList[this.candIdx].rot;
@@ -296,6 +297,11 @@ export class Builder {
       this.refreshHover();
       return;
     }
+    this.rotatePiece();
+  }
+
+  /** Rotates the selected piece in place (skipping rotations that change nothing). */
+  rotatePiece(): void {
     const p = this.selectedPiece();
     if (!p || p.fixed) return;
     const directional = !['track', 'gate', 'switch', 'brake', 'ramp', 'curve', 'drop', 'splitter'].includes(p.type);

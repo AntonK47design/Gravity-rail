@@ -200,7 +200,9 @@ export class UI {
     this.modalWrap.style.pointerEvents = 'none';
     const cb = this.onModalClose;
     this.onModalClose = null;
-    cb?.();
+    if (cb) cb();
+    // Any modal closing while the game is paused resumes it (resume is a no-op otherwise).
+    else this.a.resume();
   }
 
   showPause(): void {
@@ -220,6 +222,7 @@ export class UI {
             this.a.openLevels();
           }, '', ICON.grid),
           this.button('Settings', () => this.showSettings(() => this.showPause()), '', ICON.gear),
+          this.button('How to play', () => this.showHowTo(() => this.showPause()), '', ICON.help),
           this.button('Main menu', () => {
             this.closeModal();
             this.a.backToMenu();

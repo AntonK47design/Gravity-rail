@@ -1,8 +1,5 @@
 import * as THREE from 'three';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import type { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { CameraController } from './camera';
 import { Environment } from './environment';
 
@@ -53,7 +50,7 @@ export class Renderer {
   profile: QualityProfile;
   quality: Quality;
   private composer: EffectComposer | null = null;
-  private bloom: UnrealBloomPass | null = null;
+  private loadingComposer = false;
   private width = 1;
   private height = 1;
 
@@ -83,19 +80,36 @@ export class Renderer {
       if (m) (Array.isArray(m) ? m : [m]).forEach((mm) => (mm.needsUpdate = true));
     });
     if (this.profile.bloom) {
-      if (!this.composer) {
-        this.composer = new EffectComposer(this.renderer);
-        this.composer.addPass(new RenderPass(this.scene, this.camera));
-        this.bloom = new UnrealBloomPass(new THREE.Vector2(this.width, this.height), 0.55, 0.5, 0.82);
-        this.composer.addPass(this.bloom);
-        this.composer.addPass(new OutputPass());
-      }
+      if (!this.composer && !this.loadingComposer) void this.loadComposer();
     } else if (this.composer) {
       this.composer.dispose();
       this.composer = null;
-      this.bloom = null;
     }
     this.resize();
+  }
+
+  /** Bloom is code-split: only High quality downloads the post-processing chain. */
+  private async loadComposer(): Promise<void> {
+    this.loadingComposer = true;
+    try {
+      const [{ EffectComposer }, { RenderPass }, { UnrealBloomPass }, { OutputPass }] = await Promise.all([
+        import('three/examples/jsm/postprocessing/EffectComposer.js'),
+        import('three/examples/jsm/postprocessing/RenderPass.js'),
+        import('three/examples/jsm/postprocessing/UnrealBloomPass.js'),
+        import('three/examples/jsm/postprocessing/OutputPass.js'),
+      ]);
+      if (!this.profile.bloom) return;
+      const composer = new EffectComposer(this.renderer);
+      composer.addPass(new RenderPass(this.scene, this.camera));
+      composer.addPass(new UnrealBloomPass(new THREE.Vector2(this.width, this.height), 0.55, 0.5, 0.82));
+      composer.addPass(new OutputPass());
+      this.composer = composer;
+      this.resize();
+    } catch (e) {
+      console.warn('[render] bloom unavailable', e);
+    } finally {
+      this.loadingComposer = false;
+    }
   }
 
   resize(): void {
@@ -105,6 +119,10 @@ export class Renderer {
     this.height = h;
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
+    this.cam.viewW = w;
+    this.cam.viewH = h;
+    const narrow = w < 760;
+    this.cam.insets = { top: narrow ? 100 : 70, bottom: narrow ? 160 : 110, left: 12, right: 12 };
     this.camera.fov = w / h < 0.8 ? 52 : 40;
     this.camera.updateProjectionMatrix();
     if (this.composer) {

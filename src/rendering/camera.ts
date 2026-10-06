@@ -28,23 +28,87 @@ export class CameraController {
 
   constructor(readonly camera: THREE.PerspectiveCamera) {}
 
+  /** Screen-space margins (px) reserved for HUD chrome when framing. */
+  insets = { top: 70, bottom: 110, left: 16, right: 16 };
+
+  /**
+   * Fit the playfield in the free screen area: binary-search the distance at
+   * which every corner of the box projects inside the HUD-safe rectangle,
+   * then nudge the target so the board is centred in that rectangle.
+   */
   frame(box: THREE.Box3, instant = false, reset = true, yaw = Math.PI / 4 + 0.12): void {
     const centre = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
-    const radius = Math.max(size.x, size.z) * 0.62 + size.y * 0.35 + 1.2;
-    const aspect = this.camera.aspect;
-    const fov = THREE.MathUtils.degToRad(this.camera.fov);
-    const fit = radius / Math.sin(fov / 2) / Math.min(1.25, Math.max(0.62, aspect * 0.85));
+    const pitch = 0.86;
+    const cam = this.camera.clone() as THREE.PerspectiveCamera;
+    const vw = Math.max(1, this.viewW);
+    const vh = Math.max(1, this.viewH);
+    const safe = {
+      x0: (this.insets.left / vw) * 2 - 1,
+      x1: 1 - (this.insets.right / vw) * 2,
+      y0: (this.insets.bottom / vh) * 2 - 1,
+      y1: 1 - (this.insets.top / vh) * 2,
+    };
+    const corners: THREE.Vector3[] = [];
+    for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y - 0.4, box.max.y]) for (const z of [box.min.z, box.max.z]) corners.push(new THREE.Vector3(x, y, z));
+    const place = (target: THREE.Vector3, dist: number) => {
+      const cp = Math.cos(pitch);
+      cam.position.set(target.x + Math.sin(yaw) * cp * dist, target.y + Math.sin(pitch) * dist, target.z + Math.cos(yaw) * cp * dist);
+      cam.lookAt(target);
+      cam.updateMatrixWorld();
+    };
+    const extent = (target: THREE.Vector3, dist: number) => {
+      place(target, dist);
+      let x0 = Infinity;
+      let x1 = -Infinity;
+      let y0 = Infinity;
+      let y1 = -Infinity;
+      for (const c of corners) {
+        const p = c.clone().project(cam);
+        x0 = Math.min(x0, p.x);
+        x1 = Math.max(x1, p.x);
+        y0 = Math.min(y0, p.y);
+        y1 = Math.max(y1, p.y);
+      }
+      return { x0, x1, y0, y1 };
+    };
+    const target = centre.clone();
+    let dist = 10;
+    for (let iter = 0; iter < 3; iter++) {
+      let lo = 2;
+      let hi = 80;
+      for (let i = 0; i < 24; i++) {
+        const mid = (lo + hi) / 2;
+        const e = extent(target, mid);
+        const fits = e.x1 - e.x0 <= (safe.x1 - safe.x0) * 0.94 && e.y1 - e.y0 <= (safe.y1 - safe.y0) * 0.94;
+        if (fits) hi = mid;
+        else lo = mid;
+      }
+      dist = hi;
+      // Re-centre: shift the target so the projected box centre sits in the safe-area centre.
+      const e = extent(target, dist);
+      const dx = (e.x0 + e.x1) / 2 - (safe.x0 + safe.x1) / 2;
+      const dy = (e.y0 + e.y1) / 2 - (safe.y0 + safe.y1) / 2;
+      const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+      const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+      const worldPerNdc = dist * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2);
+      target.addScaledVector(right, dx * worldPerNdc * cam.aspect);
+      target.addScaledVector(fwd, (dy * worldPerNdc) / Math.sin(pitch));
+    }
+    const radius = Math.max(size.x, size.z) * 0.62 + 1.2;
     this.bounds.copy(box).expandByScalar(2);
     this.minDist = Math.max(3.5, radius * 0.6);
-    this.maxDist = fit * 1.8;
-    this.home.target.copy(centre);
+    this.maxDist = Math.max(dist * 1.8, this.minDist + 4);
+    this.home.target.copy(target);
     this.home.yaw = yaw;
-    this.home.pitch = 0.86;
-    this.home.dist = fit * 0.92;
+    this.home.pitch = pitch;
+    this.home.dist = dist;
     if (reset) this.resetView(instant);
     else this.goalDist = THREE.MathUtils.clamp(this.goalDist, this.minDist, this.maxDist);
   }
+
+  viewW = 1280;
+  viewH = 800;
 
   resetView(instant = false): void {
     this.goalTarget.copy(this.home.target);
@@ -57,6 +121,13 @@ export class CameraController {
       this.pitch = this.goalPitch;
       this.dist = this.goalDist;
     }
+  }
+
+  /** Start slightly further out and swing in — a gentle reveal when a level opens. */
+  flyIn(): void {
+    this.dist = this.goalDist * 1.45;
+    this.yaw = this.goalYaw - 0.5;
+    this.pitch = Math.min(1.35, this.goalPitch + 0.25);
   }
 
   orbit(dYaw: number, dPitch: number): void {
@@ -90,7 +161,7 @@ export class CameraController {
   }
 
   update(dt: number): void {
-    const k = 1 - Math.exp(-dt * 9);
+    const k = 1 - Math.exp(-dt * 6.5);
     if (this.autoOrbit) this.goalYaw += this.autoOrbit * dt;
     const tgt = this.goalTarget.clone();
     if (this.followPoint) tgt.lerp(this.followPoint, this.followWeight);

@@ -236,14 +236,14 @@ export class BoardView {
     const vel = launcherVelocity(p as PlacedPiece);
     const y0 = levelY(p.level) + RAIL_Y;
     const pts: number[] = [];
-    for (let t = 0.06; t < 2.2; t += 0.06) {
+    for (let t = 0.05; t < 2.2; t += 0.05) {
       const y = y0 + vel.y * t - 0.5 * G * t * t;
       if (y < y0 - 1.5) break;
       pts.push(p.x + vel.x * t, y, p.z + vel.z * t);
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
-    return new THREE.Points(g, new THREE.PointsMaterial({ color, size: 0.07, map: glowTexture(), transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending }));
+    return new THREE.Points(g, new THREE.PointsMaterial({ color, size: 0.16, map: glowTexture(), transparent: true, opacity: 0.95, depthWrite: false, blending: THREE.AdditiveBlending }));
   }
 
   // ---------------------------------------------------------------- ghost
@@ -435,7 +435,7 @@ export class BoardView {
     }
     this.arcs.visible = this.buildMode;
     this.guides.visible = this.buildMode;
-    this.guideMat.opacity = 0.12 + (Math.sin(t * 4) + 1) * 0.1;
+    this.guideMat.opacity = 0.18 + (Math.sin(t * 4) + 1) * 0.14;
 
     this.shards.forEach((s, i) => {
       s.rotation.y = t * 1.5 + i;
