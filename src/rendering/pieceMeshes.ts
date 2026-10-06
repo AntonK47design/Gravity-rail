@@ -36,29 +36,64 @@ const PROFILE: [number, number][] = [
 ];
 
 /**
- * Splitter branches share one floor, so each branch keeps only its OUTER wall
- * (the inner walls would cut through the other branch). Branch 0 turns left
- * (outer wall on the right, +u); branch 1 turns right (outer wall on -u).
- * Branch 1's floor sits a hair lower so the shared floor never z-fights.
+ * Splitter = a track junction. Both branches share the entry, so each keeps
+ * only its INSIDE wall (toward the corner it curves around); the outside walls
+ * would cut straight across the other branch. A solid divider wedge between
+ * the exits (built separately) forms the outer walls. Branch 0 turns left
+ * (inside wall on -u), branch 1 turns right (inside wall on +u). Branch 1's
+ * floor sits a hair lower so the shared floor never z-fights.
  */
 const SPLIT_PROFILES: [number, number][][] = [
+  [
+    [-0.22, -0.25],
+    [0.16, -0.25],
+    [0.16, -0.165],
+    [-0.16, -0.165],
+    [-0.16, -0.07],
+    [-0.22, -0.07],
+  ],
   [
     [-0.16, -0.25],
     [0.22, -0.25],
     [0.22, -0.07],
     [0.16, -0.07],
-    [0.16, -0.165],
-    [-0.16, -0.165],
-  ],
-  [
-    [-0.22, -0.25],
-    [0.16, -0.25],
     [0.16, -0.167],
     [-0.16, -0.167],
-    [-0.16, -0.07],
-    [-0.22, -0.07],
   ],
 ];
+
+/**
+ * The divider island between the two exits: bounded by the outer floor edges
+ * of both branches (circles of radius 0.66 around the west corners) and the
+ * east side of the cell. Its tip is where the branches part.
+ */
+function splitterDivider(): THREE.BufferGeometry {
+  const R = 0.66;
+  const tipT = Math.asin(0.5 / R);
+  const tipX = -0.5 + R * Math.cos(tipT);
+  // Shape space (sx, sy) maps to world (x = sx, z = -sy) after the rotation below.
+  const shape = new THREE.Shape();
+  shape.moveTo(tipX, 0);
+  const steps = 16;
+  // North branch outer edge: circle around (-0.5, z -0.5), from the tip to the north exit.
+  for (let i = 1; i <= steps; i++) {
+    const t = tipT * (1 - i / steps);
+    shape.lineTo(-0.5 + R * Math.cos(t), 0.5 - R * Math.sin(t));
+  }
+  shape.lineTo(0.46, 0.5);
+  shape.lineTo(0.46, -0.5);
+  // South branch outer edge: circle around (-0.5, z 0.5), from the south exit back to the tip.
+  for (let i = 0; i < steps; i++) {
+    const t = (tipT * i) / steps;
+    shape.lineTo(-0.5 + R * Math.cos(t), -0.5 + R * Math.sin(t));
+  }
+  const h = RAIL_Y - 0.07 - 0.1;
+  const g = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false });
+  g.rotateX(-Math.PI / 2);
+  g.translate(0, 0.1, 0);
+  g.computeVertexNormals();
+  return g;
+}
 
 const geoCache = new Map<string, THREE.BufferGeometry>();
 function cached(key: string, make: () => THREE.BufferGeometry): THREE.BufferGeometry {
@@ -332,11 +367,18 @@ export function buildPieceModel(type: PieceType, opts: PieceModelOpts = {}): { g
       break;
     }
     case 'splitter': {
+      const divider = mesh(cached('splitDivider', splitterDivider), stdMat(PALETTE.rail, { rough: 0.45, metal: 0.05 }));
+      group.add(divider);
+      // Flipper hinged at the divider tip, pointing back toward the entry: it
+      // closes off the branch the sphere will NOT take.
+      const tipX = -0.5 + Math.sqrt(0.66 * 0.66 - 0.25);
       const pivot = new THREE.Group();
-      pivot.position.set(-0.12, RAIL_Y - 0.1, 0);
-      const paddle = mesh(cached('paddle', () => new RoundedBoxGeometry(0.3, 0.1, 0.04, 1, 0.015)), glowMat(def.color, 0.5));
-      paddle.position.x = 0.15;
+      pivot.position.set(tipX, RAIL_Y - 0.1, 0);
+      const paddle = mesh(cached('paddle2', () => new RoundedBoxGeometry(0.32, 0.12, 0.05, 1, 0.02)), glowMat(def.color, 0.6));
+      paddle.position.x = -0.16;
       pivot.add(paddle);
+      const hinge = mesh(cached('hinge', () => new THREE.CylinderGeometry(0.045, 0.045, 0.16, 14)), glowMat(def.color, 0.8));
+      pivot.add(hinge);
       group.add(pivot);
       anim.flipper = pivot;
       break;
