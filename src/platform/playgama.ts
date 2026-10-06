@@ -6,6 +6,8 @@ interface Bridge {
   platform: { sendMessage(msg: string): Promise<void> | void };
   advertisement: {
     showInterstitial(): void;
+    showRewarded(placement?: string): void;
+    isRewardedSupported?: boolean;
     on(event: string, cb: (state: string) => void): void;
   };
   game?: { on(event: string, cb: (state: string) => void): void };
@@ -18,6 +20,7 @@ export class PlaygamaPlatform implements PlatformAdapter {
   readonly name = 'playgama';
   private bridge: Bridge | null = null;
   private adCb: ((state: string) => void) | null = null;
+  private rewardCb: ((state: string) => void) | null = null;
 
   async init(): Promise<void> {
     const w = window as unknown as { bridge?: Bridge };
@@ -27,6 +30,7 @@ export class PlaygamaPlatform implements PlatformAdapter {
         await w.bridge.initialize();
         this.bridge = w.bridge;
         this.bridge.advertisement.on('interstitial_state_changed', (state) => this.adCb?.(state));
+        this.bridge.advertisement.on('rewarded_state_changed', (state) => this.rewardCb?.(state));
       }
     } catch (e) {
       console.warn('[platform] Playgama bridge unavailable, continuing without it', e);
@@ -75,6 +79,40 @@ export class PlaygamaPlatform implements PlatformAdapter {
         finish();
       }
       window.setTimeout(finish, 45000);
+    });
+  }
+
+  get rewardedAvailable(): boolean {
+    try {
+      return !!this.bridge && this.bridge.advertisement.isRewardedSupported !== false;
+    } catch {
+      return false;
+    }
+  }
+
+  showRewarded(placement: string, pause: () => void, resume: () => void): Promise<boolean> {
+    return new Promise((resolve) => {
+      if (!this.bridge) return resolve(false);
+      let rewarded = false;
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        this.rewardCb = null;
+        resume();
+        resolve(rewarded);
+      };
+      this.rewardCb = (state) => {
+        if (state === 'opened') pause();
+        else if (state === 'rewarded') rewarded = true; // grant only on this state
+        else if (state === 'closed' || state === 'failed') finish();
+      };
+      try {
+        this.bridge.advertisement.showRewarded(placement);
+      } catch {
+        finish();
+      }
+      window.setTimeout(finish, 90000);
     });
   }
 

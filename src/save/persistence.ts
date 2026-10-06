@@ -1,6 +1,6 @@
 import type { Placement } from '../core/level';
 import type { Quality } from '../rendering/Renderer';
-import { DailyState, REWARD } from '../meta/economy';
+import type { DailyState } from '../meta/economy';
 import { DEFAULT_SKIN } from '../meta/skins';
 
 export interface LevelRecord {
@@ -33,11 +33,15 @@ export interface SaveData {
   /** Equipped skin id. */
   skin: string;
   daily: DailyState;
+  /** Economy version — bumping it resets the Gears balance once. */
+  econ: number;
 }
 
 const KEY = 'gravityrail.save.v1';
 /** Saves from before the rename (when the game was called ORBITAL). */
 const LEGACY_KEYS = ['orbital.save.v1'];
+/** v2: everyone starts at 0 Gears (an earlier build credited old progress). */
+const ECON_VERSION = 2;
 
 export const DEFAULT_SETTINGS: Settings = {
   music: 0.6,
@@ -50,7 +54,7 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 function fresh(): SaveData {
-  return { version: 1, levels: {}, settings: { ...DEFAULT_SETTINGS }, seenIntro: false, coins: 0, skins: [DEFAULT_SKIN], skin: DEFAULT_SKIN, daily: { last: null, streak: 0 } };
+  return { version: 1, levels: {}, settings: { ...DEFAULT_SETTINGS }, seenIntro: false, coins: 0, skins: [DEFAULT_SKIN], skin: DEFAULT_SKIN, daily: { last: null, streak: 0 }, econ: ECON_VERSION };
 }
 
 /**
@@ -92,8 +96,6 @@ export class Persistence {
       const parsed = JSON.parse(raw) as Partial<SaveData>;
       if (!parsed || parsed.version !== 1) return fresh();
       const levels: Record<string, LevelRecord> = typeof parsed.levels === 'object' && parsed.levels ? parsed.levels : {};
-      // Saves from before the shop existed get the Gears they would have earned.
-      const earned = Object.values(levels).reduce((n, r) => n + (r.completed ? REWARD.firstClear : 0) + (r.stars || 0) * REWARD.perStar, 0);
       const skins = Array.isArray(parsed.skins) ? parsed.skins.filter((x): x is string => typeof x === 'string') : [];
       if (!skins.includes(DEFAULT_SKIN)) skins.unshift(DEFAULT_SKIN);
       return {
@@ -101,10 +103,12 @@ export class Persistence {
         levels,
         settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
         seenIntro: !!parsed.seenIntro,
-        coins: typeof parsed.coins === 'number' && parsed.coins >= 0 ? Math.floor(parsed.coins) : earned,
+        // Everyone starts at 0 Gears; older economy versions are reset once.
+        coins: parsed.econ === ECON_VERSION && typeof parsed.coins === 'number' && parsed.coins >= 0 ? Math.floor(parsed.coins) : 0,
         skins,
         skin: typeof parsed.skin === 'string' && skins.includes(parsed.skin) ? parsed.skin : DEFAULT_SKIN,
         daily: parsed.daily && typeof parsed.daily.streak === 'number' ? parsed.daily : { last: null, streak: 0 },
+        econ: ECON_VERSION,
       };
     } catch {
       return fresh();

@@ -38,6 +38,8 @@ export interface CompleteInfo {
   challengeMet: boolean;
   /** Gears earned by this run. */
   coins: number;
+  /** Offer "watch an ad to double" (platform supports rewarded ads). */
+  canDouble: boolean;
   newBest: boolean;
   hasNext: boolean;
   firstTime: boolean;
@@ -385,9 +387,17 @@ export class UI {
           `<div class="stat"><span>Time</span><span>${info.time.toFixed(2)}s${info.newBest && !info.firstTime ? '<span class="badge">BEST</span>' : ''}</span></div>
           <div class="stat"><span>Components</span><span>${info.used} / ${info.par} ${ok(info.used <= info.par)}</span></div>
           <div class="stat"><span>${escapeHtml(info.challenge)}</span><span>${ok(info.challengeMet)}</span></div>
-          ${info.coins > 0 ? `<div class="stat earned"><span>${CURRENCY} earned</span><span class="coins"><i>${ICON.cog}</i>+${info.coins}</span></div>` : ''}`,
+          ${info.coins > 0 ? `<div class="stat earned"><span>${CURRENCY} earned</span><span class="coins"><i>${ICON.cog}</i>+<b class="amt">${info.coins}</b></span></div>` : ''}`,
         ),
       );
+      if (info.coins > 0 && info.canDouble) {
+        const dbl = this.button(`Watch ad · Double to ${info.coins * 2}`, () => {
+          dbl.disabled = true;
+          dbl.querySelector('span')!.textContent = 'Loading ad…';
+          this.a.doubleReward();
+        }, 'double-btn', ICON.play);
+        m.appendChild(dbl);
+      }
       const row = el('div', 'row');
       if (info.hasNext) row.append(this.button('Next level', () => this.a.nextLevel(), 'primary', ICON.next));
       row.append(this.button('Replay', () => this.a.replay(), '', ICON.replay), this.button('Levels', () => this.a.openLevels(), '', ICON.grid));
@@ -409,6 +419,21 @@ export class UI {
     requestAnimationFrame(() => b.classList.add('show'));
     setTimeout(() => b.classList.remove('show'), 1900);
     setTimeout(() => b.remove(), 2600);
+  }
+
+  /** Result of a rewarded ad on the complete screen. */
+  setDoubled(ok: boolean, total: number): void {
+    const btn = this.modal.querySelector('.double-btn') as HTMLButtonElement | null;
+    const amt = this.modal.querySelector('.stat.earned .amt');
+    if (ok && amt) amt.textContent = String(total);
+    if (!btn) return;
+    if (ok) {
+      btn.querySelector('span')!.textContent = 'Doubled!';
+      btn.classList.add('done');
+    } else {
+      btn.disabled = false;
+      btn.querySelector('span')!.textContent = 'Ad unavailable — try again';
+    }
   }
 
   // ---------------------------------------------------------------- shop & daily

@@ -20,6 +20,7 @@ export interface UIActions {
   buySkin(id: string): void;
   equipSkin(id: string): void;
   openDaily(): void;
+  doubleReward(): void;
   moveSelected(): void;
   raiseSelected(dir: number): void;
   flipSelected(): void;

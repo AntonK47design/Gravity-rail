@@ -61,7 +61,11 @@ npm run preview      # serve the production build
 - The **Shop** (main menu, or click the Gears balance) sells eight sphere skins: Spark, Rose, Volt,
   Ember, Gilded, Void, Comet and Prism. Each skin changes the sphere's colour, glow and trail. Skins are
   purely cosmetic and never change the physics.
-- Saves from before the shop existed are credited with the Gears they would have earned.
+- Every player starts with 0 Gears. Older saves get a one-time reset of the balance, but keep their
+  stars and owned skins.
+- **Double with an ad:** on platforms with rewarded ads (Playgama, and CrazyGames), the level-complete
+  screen offers to double the Gears just earned. The reward is granted only after the ad finishes.
+  Run `npm run dev` and open `?fakeads` to test the flow locally with a simulated ad.
 - The rules live in `src/meta/economy.ts` and the catalogue in `src/meta/skins.ts`. Both are covered by
   `tests/economy.test.ts`.
 
@@ -189,7 +193,7 @@ is chosen at boot:
 
 The adapters load the SDK with a timeout and fall back to a no-op local adapter if it isn't available.
 The core game never depends on an external service. Midgame ads are requested only at natural breaks
-(every third completed level), and audio is suspended while an ad plays.
+(every second completed level), and audio is suspended while an ad plays.
 
 ### Building for a portal
 

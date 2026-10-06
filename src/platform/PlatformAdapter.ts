@@ -19,6 +19,13 @@ export interface PlatformAdapter {
    * `pause`/`resume` let the game mute audio while an ad is shown.
    */
   commercialBreak(pause: () => void, resume: () => void): Promise<void>;
+  /** True when the platform can show a rewarded ad right now. */
+  readonly rewardedAvailable: boolean;
+  /**
+   * Rewarded ad. Resolves true only if the player watched it to the end
+   * (the reward must be granted only then). Never rejects.
+   */
+  showRewarded(placement: string, pause: () => void, resume: () => void): Promise<boolean>;
   /** Platform wants the game muted/unmuted (optional). */
   onAudioChange?(cb: (muted: boolean) => void): void;
 }
@@ -32,6 +39,19 @@ export class LocalPlatform implements PlatformAdapter {
   gameplayStop(): void {}
   happyTime(): void {}
   async commercialBreak(): Promise<void> {}
+
+  /** Dev only: `?fakeads` simulates a rewarded ad so the UI can be tested locally. */
+  get rewardedAvailable(): boolean {
+    return import.meta.env.DEV && new URLSearchParams(location.search).has('fakeads');
+  }
+
+  async showRewarded(_placement: string, pause: () => void, resume: () => void): Promise<boolean> {
+    if (!this.rewardedAvailable) return false;
+    pause();
+    await new Promise((r) => setTimeout(r, 800));
+    resume();
+    return true;
+  }
 }
 
 /** Loads an external SDK script with a timeout. Never throws. */

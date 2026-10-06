@@ -22,6 +22,9 @@ import { claimDaily, dailyStatus, dayKey, levelReward } from '../meta/economy';
 import { SKINS, skinById } from '../meta/skins';
 import { playEvents } from './feedback';
 
+/** Show an interstitial after every N completed levels (platform builds only). */
+const INTERSTITIAL_EVERY = 2;
+
 type State = 'menu' | 'select' | 'build' | 'play' | 'complete';
 
 /**
@@ -56,6 +59,8 @@ export class Game implements UIActions, InputHandler {
   private guideActive = false;
   private worldTabFocus = 0;
   private dailyOffered = false;
+  private lastEarned = 0;
+  private doubled = false;
   /** Debug hooks (dev only). */
   onFrame: ((dt: number) => void) | null = null;
 
@@ -328,8 +333,8 @@ export class Game implements UIActions, InputHandler {
     const next = Math.min(LEVELS.length - 1, this.levelIndex + 1);
     this.ui.closeModal();
     const go = () => this.ui.fade(() => this.loadLevel(next));
-    // Natural break for platform ads: every third completed level.
-    if (this.completedThisSession > 0 && this.completedThisSession % 3 === 0) {
+    // Natural break for platform ads: an interstitial every second completed level.
+    if (this.completedThisSession > 0 && this.completedThisSession % INTERSTITIAL_EVERY === 0) {
       this.platform
         .commercialBreak(
           () => this.audio.suspend(true),
@@ -391,6 +396,23 @@ export class Game implements UIActions, InputHandler {
     this.ball.applySkin(skinById(this.save.data.skin));
     this.audio.sfx?.rotate();
     this.openShop();
+  }
+
+  /** Rewarded ad on the level-complete screen: double the Gears just earned. */
+  doubleReward(): void {
+    if (this.doubled || this.lastEarned <= 0) return;
+    const bonus = this.lastEarned;
+    this.platform
+      .showRewarded('double_gears', () => this.audio.suspend(true), () => this.audio.suspend(false))
+      .then((ok) => {
+        if (ok && !this.doubled) {
+          this.doubled = true;
+          this.save.addCoins(bonus);
+          this.audio.sfx?.star(2);
+          this.refreshWallet();
+        }
+        this.ui.setDoubled(ok, bonus * 2);
+      });
   }
 
   openDaily(): void {
@@ -630,6 +652,8 @@ export class Game implements UIActions, InputHandler {
     const firstTime = !prev.completed;
     const { newBest, prevStars } = this.save.recordResult(this.level.id, score.stars, sim.stats.time);
     const earned = levelReward(prevStars, score.stars, firstTime);
+    this.lastEarned = earned;
+    this.doubled = false;
     if (earned) this.save.addCoins(earned);
     this.completedThisSession++;
     if (score.stars === 3) this.platform.happyTime();
@@ -650,6 +674,7 @@ export class Game implements UIActions, InputHandler {
           firstTime,
           hasNext: this.levelIndex < LEVELS.length - 1,
           coins: earned,
+          canDouble: earned > 0 && this.platform.rewardedAvailable,
         },
         (i) => {
           this.audio.sfx?.star(i);
