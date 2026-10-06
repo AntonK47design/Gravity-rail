@@ -8,7 +8,7 @@ export const PALETTE = {
   boardEdge: 0x0f1420,
   socket: 0x252e42,
   socketLine: 0x2a3550,
-  rail: 0xe9eef6,
+  rail: 0xc9d2e0,
   railDark: 0xb7c2d4,
   tile: 0x2c364c,
   pillar: 0x3a465e,

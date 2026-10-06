@@ -330,8 +330,8 @@ export class UI {
           <div><b>★</b> reach the goal &nbsp; <b>★★</b> stay within the part limit &nbsp; <b>★★★</b> also beat the level's challenge.</div>
           ${
             touch
-              ? `<div class="keys"><kbd>Tap</kbd><span>Place / select</span><kbd>Drag</kbd><span>Move camera</span><kbd>Two fingers</kbd><span>Rotate & pinch to zoom</span></div>`
-              : `<div class="keys"><kbd>Left click</kbd><span>Place / select</span><kbd>Right / middle drag</kbd><span>Orbit camera</span><kbd>Shift + drag</kbd><span>Pan</span><kbd>Wheel</kbd><span>Zoom</span><kbd>R</kbd><span>Rotate / cycle placement</span><kbd>[ ]</kbd><span>Lower / raise selected</span><kbd>Del</kbd><span>Remove</span><kbd>Z</kbd><span>Undo</span><kbd>Space</kbd><span>Play / stop</span><kbd>1–9</kbd><span>Pick component</span></div>`
+              ? `<div class="keys"><kbd>Tap</kbd><span>Place / select</span><kbd>Drag a piece</kbd><span>Move it</span><kbd>Drag</kbd><span>Move camera</span><kbd>Two fingers</kbd><span>Rotate & pinch to zoom</span></div>`
+              : `<div class="keys"><kbd>Left click</kbd><span>Place / select</span><kbd>Drag a piece</kbd><span>Move it (or G)</span><kbd>Right / middle drag</kbd><span>Orbit camera</span><kbd>Shift + drag</kbd><span>Pan</span><kbd>Wheel</kbd><span>Zoom</span><kbd>R</kbd><span>Rotate / cycle placement</span><kbd>[ ]</kbd><span>Lower / raise selected</span><kbd>Del</kbd><span>Remove</span><kbd>Z</kbd><span>Undo</span><kbd>Space</kbd><span>Play / stop</span><kbd>1–9</kbd><span>Pick component</span></div>`
           }`,
         ),
       );

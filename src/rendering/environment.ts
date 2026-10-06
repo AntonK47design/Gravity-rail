@@ -34,10 +34,10 @@ export class Environment {
     this.sky.renderOrder = -10;
     scene.add(this.sky);
 
-    this.hemi = new THREE.HemisphereLight(0xc4d2ff, 0x262a3a, 1.6);
+    this.hemi = new THREE.HemisphereLight(0xc4d2ff, 0x262a3a, 1.2);
     scene.add(this.hemi);
 
-    this.key = new THREE.DirectionalLight(0xfff1dd, 2.6);
+    this.key = new THREE.DirectionalLight(0xfff1dd, 2.1);
     this.key.position.set(-6, 12, 5);
     this.key.shadow.bias = -0.0004;
     this.key.shadow.normalBias = 0.02;

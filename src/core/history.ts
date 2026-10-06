@@ -3,9 +3,17 @@ import { Board, PlacedPiece } from './board';
 export type Action =
   | { kind: 'place'; piece: PlacedPiece }
   | { kind: 'remove'; piece: PlacedPiece }
-  | { kind: 'move'; id: number; from: { level: number; rot: number }; to: { level: number; rot: number } }
+  | { kind: 'move'; id: number; from: Pose; to: Pose }
   | { kind: 'toggle'; id: number; from: number; to: number }
   | { kind: 'clear'; pieces: PlacedPiece[] };
+
+/** Where a piece sits; x/z are only present when the piece changed cell. */
+export interface Pose {
+  level: number;
+  rot: number;
+  x?: number;
+  z?: number;
+}
 
 const clone = (p: PlacedPiece): PlacedPiece => ({ ...p, props: { ...p.props } });
 

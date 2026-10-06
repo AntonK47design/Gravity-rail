@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Board, Candidate, PlaceError, PlacedPiece, computePorts } from '../core/board';
 import { PIECES, PieceType, TOOL_ORDER } from '../core/components';
 import { levelY } from '../core/grid';
-import { History } from '../core/history';
+import { History, Pose } from '../core/history';
 import type { LevelDef, Placement } from '../core/level';
 import type { BoardView } from '../rendering/BoardView';
 import type { Effects } from '../rendering/effects';
@@ -37,6 +37,8 @@ export class Builder {
   private candCell = '';
   private hoverNdc: THREE.Vector2 | null = null;
   private ray = new THREE.Raycaster();
+  /** A placed piece being carried to a new spot (drag, or the Move button). */
+  moving: { id: number; from: Pose & { x: number; z: number }; drag: boolean } | null = null;
   readonly history = new History();
 
   constructor(
@@ -53,6 +55,8 @@ export class Builder {
     this.level = level;
     this.tool = null;
     this.selected = null;
+    this.moving = null;
+    this.view.setCarried(null);
     this.history.clear();
     this.candList = [];
     this.candCell = '';
@@ -106,6 +110,7 @@ export class Builder {
   // ---------------------------------------------------------------- tools
 
   setTool(t: PieceType | null): void {
+    if (t) this.cancelMove(true);
     if (t && this.left(t) <= 0) {
       this.fb.sound('invalid');
       this.fb.toast(`No ${PIECES[t].name} left — remove one to reuse it.`, 'bad');
@@ -138,8 +143,15 @@ export class Builder {
    * keep the best-scoring candidate. Aiming next to an elevated rail end
    * therefore snaps to that height automatically.
    */
+  /** The piece type currently previewed: the carried piece, or the toolbar tool. */
+  private activeType(): PieceType | null {
+    if (this.moving) return this.board.pieces.get(this.moving.id)?.type ?? null;
+    return this.tool;
+  }
+
   private pickCandidate(ndc: THREE.Vector2): { best: Candidate | null; list: Candidate[]; cell: string } {
-    const tool = this.tool!;
+    const tool = this.activeType()!;
+    const ignore = this.moving?.id;
     this.setRay(ndc);
     let best: Candidate | null = null;
     let bestList: Candidate[] = [];
@@ -153,7 +165,7 @@ export class Builder {
       if (L === 0) floorCell = [cx, cz];
       if (!this.board.inBounds(cx, cz)) continue;
       const list = this.board
-        .candidates(tool, cx, cz, L, this.toolRot, undefined, this.energized)
+        .candidates(tool, cx, cz, L, this.toolRot, ignore, this.energized)
         .filter((c) => c.level <= L && c.level >= L - 2)
         .map((c) => ({ ...c, score: c.score - (c.connections === 0 ? c.level * 3 : 0) }));
       list.sort((a, b) => b.score - a.score);
@@ -165,7 +177,7 @@ export class Builder {
     }
     if (!best && floorCell) {
       const [cx, cz] = floorCell;
-      const c = this.board.evaluate(tool, cx, cz, 0, this.toolRot);
+      const c = this.board.evaluate(tool, cx, cz, 0, this.toolRot, ignore);
       if (!this.board.inBounds(cx, cz)) {
         c.valid = false;
         c.error = 'bounds';
@@ -175,7 +187,7 @@ export class Builder {
       }
       return { best: c, list: [], cell: `${cx},${cz},x` };
     }
-    if (best && this.left(tool) <= 0) best = { ...best, valid: false, error: 'none-left' };
+    if (best && !this.moving && this.left(tool) <= 0) best = { ...best, valid: false, error: 'none-left' };
     return { best, list: bestList, cell: best ? `${best.x},${best.z}` : '' };
   }
 
@@ -185,7 +197,8 @@ export class Builder {
   }
 
   refreshHover(): void {
-    if (!this.tool || !this.hoverNdc) {
+    const type = this.activeType();
+    if (!type || !this.hoverNdc) {
       this.view.showGhost(null, null);
       return;
     }
@@ -202,7 +215,7 @@ export class Builder {
       this.candIdx = idx >= 0 ? idx : 0;
     }
     const c = this.candList.length ? this.candList[this.candIdx] : best;
-    this.view.showGhost(this.tool, c ?? null);
+    this.view.showGhost(type, c ?? null);
   }
 
   private currentCandidate(ndc: THREE.Vector2, touch: boolean): Candidate | null {
@@ -219,6 +232,16 @@ export class Builder {
   // ---------------------------------------------------------------- tap
 
   tap(ndc: THREE.Vector2, touch: boolean): void {
+    if (this.moving) {
+      // Tap-to-drop (after pressing Move).
+      const c = this.currentCandidate(ndc, touch);
+      if (c?.valid) this.commitMove(c);
+      else {
+        this.fb.sound('invalid');
+        this.fb.toast(c?.error ? ERROR_TEXT[c.error] : 'Pick a free spot — Esc cancels the move.', 'bad');
+      }
+      return;
+    }
     const hitId = this.pickPiece(ndc);
     if (this.tool) {
       if (touch && hitId !== null) {
@@ -289,7 +312,7 @@ export class Builder {
 
   /** R: cycles placement candidates while placing, or rotates the selected piece. */
   rotate(): void {
-    if (this.tool && (this.selected === null || this.hoverNdc)) {
+    if (this.moving || (this.tool && (this.selected === null || this.hoverNdc))) {
       if (this.candList.length > 1) {
         this.candIdx = (this.candIdx + 1) % this.candList.length;
         this.toolRot = this.candList[this.candIdx].rot;
@@ -335,6 +358,85 @@ export class Builder {
     this.fb.changed();
   }
 
+  // ---------------------------------------------------------------- moving
+
+  /** Can a drag starting here pick up a piece? (Build mode, no tool armed, on a player piece.) */
+  canGrab(ndc: THREE.Vector2): boolean {
+    if (this.tool || this.moving) return false;
+    const id = this.pickPiece(ndc);
+    return id !== null && !this.board.pieces.get(id)!.fixed;
+  }
+
+  /** Pick up a placed piece; its ghost follows the pointer until dropped. */
+  startMove(id: number | null = this.selected, drag = false, ndc?: THREE.Vector2): void {
+    const p = id !== null ? this.board.pieces.get(id) : undefined;
+    if (!p) return;
+    if (p.fixed) {
+      this.fb.sound('invalid');
+      this.fb.toast(ERROR_TEXT.fixed, 'bad');
+      return;
+    }
+    this.select(null);
+    this.tool = null;
+    this.moving = { id: p.id, from: { x: p.x, z: p.z, level: p.level, rot: p.rot }, drag };
+    this.view.setCarried(p.id);
+    this.toolRot = p.rot;
+    this.candCell = '';
+    this.candList = [];
+    this.fb.sound('click');
+    if (!drag) this.fb.toast('Moving — click a new spot (R rotates, Esc cancels).', 'info');
+    if (ndc) this.hoverNdc = ndc;
+    this.fb.changed();
+    this.refreshHover();
+  }
+
+  dragTo(ndc: THREE.Vector2): void {
+    if (this.moving) this.hover(ndc);
+  }
+
+  /** Release after a drag: drop if the spot is valid, otherwise snap back. */
+  endDrag(ndc: THREE.Vector2): void {
+    if (!this.moving) return;
+    if (Number.isNaN(ndc.x)) return this.cancelMove();
+    this.hover(ndc);
+    const c = this.candList.length ? this.candList[this.candIdx] : this.pickCandidate(ndc).best;
+    if (c?.valid) this.commitMove(c);
+    else {
+      this.fb.sound('invalid');
+      if (c?.error) this.fb.toast(ERROR_TEXT[c.error], 'bad');
+      this.cancelMove(true);
+    }
+  }
+
+  private commitMove(c: Candidate): void {
+    const m = this.moving!;
+    const p = this.board.pieces.get(m.id);
+    this.moving = null;
+    this.view.setCarried(null);
+    this.view.showGhost(null, null);
+    if (!p) return;
+    const to = { x: c.x, z: c.z, level: c.level, rot: c.rot };
+    const f = m.from;
+    if (to.x !== f.x || to.z !== f.z || to.level !== f.level || to.rot !== f.rot) {
+      this.history.push({ kind: 'move', id: p.id, from: f, to });
+      this.board.update(p.id, to);
+      this.fx.burst({ x: c.x, y: levelY(c.level) + 0.2, z: c.z }, PIECES[p.type].color, 12, 1.4, 0.1, 0.45, 0.8);
+      for (const port of c.ports) if (port.status === 'connected') this.fx.burst(port.pos, 0x4ade80, 6, 0.8, 0.08, 0.4);
+      this.fb.sound('place');
+    }
+    this.select(p.id);
+  }
+
+  cancelMove(quiet = false): void {
+    if (!this.moving) return;
+    const id = this.moving.id;
+    this.moving = null;
+    this.view.setCarried(null);
+    this.view.showGhost(null, null);
+    if (!quiet) this.fb.sound('undo');
+    this.select(this.board.pieces.has(id) ? id : null);
+  }
+
   flip(): void {
     const p = this.selectedPiece();
     if (!p || p.fixed || p.type !== 'splitter') return;
@@ -362,6 +464,7 @@ export class Builder {
   }
 
   undo(): void {
+    this.cancelMove(true);
     const a = this.history.undo(this.board);
     if (!a) {
       this.fb.sound('invalid');
@@ -375,6 +478,7 @@ export class Builder {
   }
 
   clear(): void {
+    this.cancelMove(true);
     const removed = this.board.clearPlayerPieces();
     if (!removed.length) return;
     this.history.push({ kind: 'clear', pieces: removed });

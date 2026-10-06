@@ -181,6 +181,7 @@ export class Hud {
       b.appendChild(lab);
       if (!opts.fixed) {
         b.append(
+          this.iconBtn(ICON.move, 'Move (G, or drag the piece)', () => this.a.moveSelected()),
           this.iconBtn(ICON.rotate, 'Rotate (R)', () => this.a.rotateSelected()),
           this.iconBtn(ICON.up, 'Raise (PgUp / ])', () => this.a.raiseSelected(1)),
           this.iconBtn(ICON.down, 'Lower (PgDn / [)', () => this.a.raiseSelected(-1)),

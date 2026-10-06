@@ -276,6 +276,10 @@ export class Game implements UIActions, InputHandler {
     this.ui.fade(() => this.loadLevel(this.levelIndex, false));
   }
 
+  moveSelected(): void {
+    if (this.state === 'build') this.builder.startMove();
+  }
+
   rotateSelected(): void {
     this.builder.rotatePiece();
   }
@@ -483,6 +487,7 @@ export class Game implements UIActions, InputHandler {
   startRun(): void {
     if (this.state !== 'build') return;
     this.audio.unlock();
+    this.builder.cancelMove(true);
     this.builder.select(null);
     this.builder.setTool(null);
     this.view.showGhost(null, null);
@@ -695,6 +700,25 @@ export class Game implements UIActions, InputHandler {
     this.refreshHud();
   }
 
+  grab(ndc: THREE.Vector2): boolean {
+    if (this.state !== 'build' || this.paused || this.ui.modalOpen) return false;
+    return this.builder.canGrab(ndc);
+  }
+
+  dragStart(ndc: THREE.Vector2): void {
+    const id = this.builder.pickPiece(ndc);
+    if (id !== null) this.builder.startMove(id, true, ndc);
+  }
+
+  dragMove(ndc: THREE.Vector2): void {
+    this.builder.dragTo(ndc);
+  }
+
+  dragEnd(ndc: THREE.Vector2): void {
+    this.builder.endDrag(ndc);
+    this.refreshHud();
+  }
+
   cameraMoved(): void {
     if (this.state === 'build') this.builder.refreshHover();
   }
@@ -710,6 +734,10 @@ export class Game implements UIActions, InputHandler {
         return;
       }
       if (this.state === 'select') return this.backToMenu();
+      if (this.builder.moving) {
+        this.builder.cancelMove();
+        return;
+      }
       if (this.builder.tool || this.builder.selected !== null) {
         this.builder.setTool(null);
         this.builder.select(null);
@@ -749,6 +777,9 @@ export class Game implements UIActions, InputHandler {
         break;
       case 't':
         if (build) this.builder.flip();
+        break;
+      case 'g':
+        if (build) this.builder.startMove();
         break;
       case 'c':
         this.resetCamera();

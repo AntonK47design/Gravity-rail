@@ -5,6 +5,11 @@ export interface InputHandler {
   hover(ndc: THREE.Vector2 | null): void;
   tap(ndc: THREE.Vector2, touch: boolean): void;
   cameraMoved(): void;
+  /** Pointer pressed on the board: return true to capture a potential object drag instead of moving the camera. */
+  grab?(ndc: THREE.Vector2, touch: boolean): boolean;
+  dragStart?(ndc: THREE.Vector2, touch: boolean): void;
+  dragMove?(ndc: THREE.Vector2): void;
+  dragEnd?(ndc: THREE.Vector2): void;
 }
 
 interface Ptr {
@@ -14,13 +19,15 @@ interface Ptr {
   sy: number;
   button: number;
   touch: boolean;
+  /** This pointer started on a draggable piece. */
+  grab: boolean;
 }
 
 /**
  * Unified mouse + touch input on the canvas.
- *  Mouse: left = place/select (left-drag orbits), right/middle drag = orbit,
+ *  Mouse: left = place/select (left-drag orbits, or moves a placed piece), right/middle drag = orbit,
  *         shift+drag = pan, wheel = zoom.
- *  Touch: tap = place/select, one-finger drag = pan, two fingers = orbit + pinch zoom.
+ *  Touch: tap = place/select, one-finger drag = pan (or moves a placed piece), two fingers = orbit + pinch zoom.
  */
 export class InputController {
   private ptrs = new Map<number, Ptr>();
@@ -28,6 +35,7 @@ export class InputController {
   private gesture = false;
   private pinchDist = 0;
   private centroid = new THREE.Vector2();
+  private objectDrag = false;
   enabled = true;
 
   constructor(
@@ -61,8 +69,16 @@ export class InputController {
       /* ignore */
     }
     const touch = e.pointerType !== 'mouse';
-    this.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, button: e.button, touch });
+    const primary = touch || e.button === 0;
+    const grab = this.ptrs.size === 0 && primary && !e.shiftKey && !!this.h.grab?.(this.ndc(e.clientX, e.clientY), touch);
+    this.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, button: e.button, touch, grab });
     if (touch && this.ptrs.size === 2) {
+      if (this.objectDrag) {
+        // A second finger turns an object drag into a camera gesture: drop back to where it started.
+        this.objectDrag = false;
+        this.h.dragEnd?.(new THREE.Vector2(NaN, NaN));
+      }
+      for (const q of this.ptrs.values()) q.grab = false;
       this.gesture = true;
       const [a, b] = [...this.ptrs.values()];
       this.pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
@@ -96,9 +112,19 @@ export class InputController {
     }
 
     const threshold = p.touch ? 10 : 5;
-    if (!this.dragging && Math.hypot(p.x - p.sx, p.y - p.sy) > threshold) this.dragging = true;
+    if (!this.dragging && Math.hypot(p.x - p.sx, p.y - p.sy) > threshold) {
+      this.dragging = true;
+      if (p.grab) {
+        this.objectDrag = true;
+        this.h.dragStart?.(this.ndc(p.sx, p.sy), p.touch);
+      }
+    }
     if (!this.dragging) {
       if (!p.touch) this.h.hover(this.ndc(e.clientX, e.clientY));
+      return;
+    }
+    if (this.objectDrag) {
+      this.h.dragMove?.(this.ndc(e.clientX, e.clientY));
       return;
     }
     if (p.touch || e.shiftKey) this.cam.pan(dx, dy, this.viewportH());
@@ -111,6 +137,10 @@ export class InputController {
     if (!p) return;
     this.ptrs.delete(e.pointerId);
     const wasTap = !this.dragging && !this.gesture && (p.touch || p.button === 0);
+    if (this.objectDrag) {
+      this.objectDrag = false;
+      this.h.dragEnd?.(this.ndc(e.clientX, e.clientY));
+    }
     if (this.ptrs.size === 0) {
       this.dragging = false;
       this.gesture = false;
@@ -127,6 +157,10 @@ export class InputController {
 
   private cancel = (e: PointerEvent): void => {
     this.ptrs.delete(e.pointerId);
+    if (this.objectDrag) {
+      this.objectDrag = false;
+      this.h.dragEnd?.(new THREE.Vector2(NaN, NaN));
+    }
     if (!this.ptrs.size) {
       this.dragging = false;
       this.gesture = false;

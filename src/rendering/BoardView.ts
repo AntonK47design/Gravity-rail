@@ -44,6 +44,7 @@ export class BoardView {
   buildMode = true;
   private energized = new Set<number>();
   private circuitComplete = false;
+  private carried: number | null = null;
   private guides = new THREE.Group();
   private guideGeo = new THREE.PlaneGeometry(0.8, 0.8);
   private guideMat = additiveMat(0x7ee8ff, 0.25);
@@ -183,7 +184,8 @@ export class BoardView {
         this.objs.set(p.id, o);
       }
       o.piece = p;
-      if (o.rot !== p.rot || o.level !== p.level) {
+      o.root.visible = p.id !== this.carried;
+      if (o.rot !== p.rot || o.level !== p.level || o.root.position.x !== p.x || o.root.position.z !== p.z) {
         o.appear = Math.min(o.appear, 0.5);
         o.rot = p.rot;
         o.level = p.level;
@@ -321,6 +323,12 @@ export class BoardView {
     }
   }
 
+  /** Hide the piece being carried (its ghost shows where it will land). */
+  setCarried(id: number | null): void {
+    this.carried = id;
+    for (const o of this.objs.values()) o.root.visible = o.piece.id !== id;
+  }
+
   select(id: number | null): void {
     this.selectedId = id;
   }
@@ -409,7 +417,7 @@ export class BoardView {
       if (o.flash > 0) o.flash = Math.max(0, o.flash - dt * 2.5);
       if (o.anim.plate) {
         const on = this.energized.has(o.piece.id) && o.piece.type !== 'block';
-        const target = on ? (this.circuitComplete ? 0.32 + Math.sin(t * 3 - o.piece.x - o.piece.z) * 0.1 : 0.18) : 0;
+        const target = on ? (this.circuitComplete ? 0.2 + Math.sin(t * 3 - o.piece.x - o.piece.z) * 0.06 : 0.1) : 0;
         o.anim.plate.emissiveIntensity += (target - o.anim.plate.emissiveIntensity) * Math.min(1, dt * 6);
       }
       this.animatePiece(o, sim, t);
@@ -494,11 +502,11 @@ export class BoardView {
         break;
       case 'goal':
         if (a.spin) a.spin.rotation.y = t * 0.8;
-        if (a.glow) a.glow.emissiveIntensity = 1.2 + Math.sin(t * 2.5) * 0.3 + o.flash * 3;
-        if (a.beam) (a.beam.material as THREE.MeshBasicMaterial).opacity = 0.3 + Math.sin(t * 2) * 0.08 + o.flash * 0.5;
+        if (a.glow) a.glow.emissiveIntensity = 0.8 + Math.sin(t * 2.5) * 0.2 + o.flash * 3;
+        if (a.beam) (a.beam.material as THREE.MeshBasicMaterial).opacity = 0.16 + Math.sin(t * 2) * 0.05 + o.flash * 0.4;
         break;
       case 'start':
-        if (a.glow) a.glow.emissiveIntensity = 1.1 + Math.sin(t * 3) * 0.4;
+        if (a.glow) a.glow.emissiveIntensity = 0.8 + Math.sin(t * 3) * 0.25;
         break;
       case 'launcher':
         if (a.glow) a.glow.emissiveIntensity = 0.6 + o.flash * 3;

@@ -46,7 +46,13 @@ function cached(key: string, make: () => THREE.BufferGeometry): THREE.BufferGeom
 }
 
 /** Sweep a closed 2D profile (u = right, v = up) along a polyline. */
-export function sweep(pts: Vec3[], profile: [number, number][] = PROFILE): THREE.BufferGeometry {
+/**
+ * Sweep a closed 2D profile (u = right, v = up) along a polyline.
+ * `upright` keeps cross-sections vertical (sheared rather than tilted) — right
+ * for slopes, so they meet flat rails cleanly and never poke out of their cell;
+ * the drop shaft needs the rotating frame to follow its vertical fall.
+ */
+export function sweep(pts: Vec3[], profile: [number, number][] = PROFILE, upright = true): THREE.BufferGeometry {
   const n = pts.length;
   const m = profile.length;
   const pos: number[] = [];
@@ -63,7 +69,12 @@ export function sweep(pts: Vec3[], profile: [number, number][] = PROFILE): THREE
     T.set(b.x - a.x, b.y - a.y, b.z - a.z).normalize();
     const l = new THREE.Vector3().crossVectors(T, up);
     if (l.lengthSq() > 1e-4) L.copy(l.normalize());
-    N.crossVectors(L, T).normalize();
+    if (upright) {
+      // Vertical section, stretched by 1/cos(slope) so the wall/floor thickness
+      // measured perpendicular to the rail stays constant.
+      const horiz = Math.max(0.3, Math.hypot(T.x, T.z));
+      N.set(0, 1 / horiz, 0);
+    } else N.crossVectors(L, T).normalize();
     frames.push({ P: new THREE.Vector3(pts[i].x, pts[i].y, pts[i].z), L: L.clone(), N: N.clone() });
   }
   // Sides: each profile edge gets its own vertex strip for crisp creases.
@@ -72,7 +83,6 @@ export function sweep(pts: Vec3[], profile: [number, number][] = PROFILE): THREE
     const [u1, v1] = profile[(j + 1) % m];
     const nu = v1 - v0;
     const nv = -(u1 - u0);
-    const len = Math.hypot(nu, nv) || 1;
     const base = pos.length / 3;
     for (let i = 0; i < n; i++) {
       const f = frames[i];
@@ -81,7 +91,8 @@ export function sweep(pts: Vec3[], profile: [number, number][] = PROFILE): THREE
         [u1, v1],
       ]) {
         pos.push(f.P.x + f.L.x * u + f.N.x * v, f.P.y + f.L.y * u + f.N.y * v, f.P.z + f.L.z * u + f.N.z * v);
-        nor.push((f.L.x * nu + f.N.x * nv) / len, (f.L.y * nu + f.N.y * nv) / len, (f.L.z * nu + f.N.z * nv) / len);
+        const nrm = new THREE.Vector3(f.L.x * nu + f.N.x * nv, f.L.y * nu + f.N.y * nv, f.L.z * nu + f.N.z * nv).normalize();
+        nor.push(nrm.x, nrm.y, nrm.z);
       }
     }
     for (let i = 0; i < n - 1; i++) {
@@ -137,8 +148,8 @@ function addTile(group: THREE.Group, color: number, y = 0): THREE.MeshStandardMa
 
 function channel(type: PieceType, index: number, mat?: THREE.Material): THREE.Mesh {
   const def = PIECES[type];
-  const geo = cached(`ch:${type}:${index}`, () => sweep(def.paths[index].pts));
-  return mesh(geo, mat ?? stdMat(PALETTE.rail, { rough: 0.32, metal: 0.05 }));
+  const geo = cached(`ch:${type}:${index}`, () => sweep(def.paths[index].pts, PROFILE, type !== 'drop'));
+  return mesh(geo, mat ?? stdMat(PALETTE.rail, { rough: 0.45, metal: 0.05 }));
 }
 
 function chevronGeo(): THREE.BufferGeometry {
@@ -210,8 +221,10 @@ export function buildPieceModel(type: PieceType, opts: PieceModelOpts = {}): { g
 
   switch (type) {
     case 'ramp': {
-      const p = mesh(cached('rampPost', () => new THREE.CylinderGeometry(0.05, 0.06, LEVEL_H + 0.05, 10)), stdMat(PALETTE.pillar));
-      p.position.set(-0.34, (LEVEL_H + 0.05) / 2 + 0.05, 0);
+      // Support under the high end, stopping just below the channel's underside.
+      const postH = LEVEL_H - 0.16;
+      const p = mesh(cached('rampPost', () => new THREE.CylinderGeometry(0.05, 0.06, postH, 10)), stdMat(PALETTE.pillar));
+      p.position.set(-0.34, 0.1 + postH / 2, 0);
       group.add(p);
       break;
     }

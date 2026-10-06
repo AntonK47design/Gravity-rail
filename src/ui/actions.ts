@@ -16,6 +16,7 @@ export interface UIActions {
   resume(): void;
   restart(): void;
   rotateSelected(): void;
+  moveSelected(): void;
   raiseSelected(dir: number): void;
   flipSelected(): void;
   removeSelected(): void;
