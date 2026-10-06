@@ -29,8 +29,7 @@ export class Hud {
   private muteBtn: HTMLButtonElement;
   private speedBtn: HTMLButtonElement;
   private bubble: HTMLDivElement;
-  private speedBar: HTMLDivElement;
-  private speedTxt: HTMLSpanElement;
+  private cells: HTMLElement[] = [];
   private tools: ToolState[] = [];
   private activeTool: PieceType | null = null;
   private pulseTool: PieceType | null = null;
@@ -65,12 +64,17 @@ export class Hud {
     this.undoBtn.classList.add('build-only');
     this.resetBtn = this.iconBtn(ICON.trash, 'Clear construction', () => a.resetBuild());
     this.resetBtn.classList.add('build-only');
-    this.speedBtn = this.iconBtn(ICON.fast, 'Speed ×2 (F)', () => a.toggleSpeed());
-    this.speedBtn.classList.add('play-only');
-    const speedo = el('div', 'speedo');
-    speedo.innerHTML = `<div class="bar"><div></div></div><span>0.0</span>`;
-    this.speedBar = speedo.querySelector('.bar div') as HTMLDivElement;
-    this.speedTxt = speedo.querySelector('span') as HTMLSpanElement;
+    // Run mode: a chunky ×1/×2 toggle and a segmented energy meter.
+    this.speedBtn = el('button', 'speed-btn play-only interactive', '<span class="x">×1</span>') as HTMLButtonElement;
+    this.speedBtn.title = 'Speed (F)';
+    this.speedBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      a.uiSound('click');
+      a.toggleSpeed();
+    });
+    const speedo = el('div', 'energy');
+    speedo.innerHTML = `<i class="bolt">${ICON.bolt}</i><div class="cells">${'<b></b>'.repeat(10)}</div>`;
+    this.cells = [...speedo.querySelectorAll<HTMLElement>('.cells b')];
     this.playBtn = el('button', 'play-btn interactive') as HTMLButtonElement;
     this.playBtn.title = 'Play / Stop (Space)';
     this.playBtn.addEventListener('click', () => a.togglePlay());
@@ -148,6 +152,7 @@ export class Hud {
     this.playBtn.classList.toggle('running', playing);
     this.playBtn.innerHTML = playing ? `${icon(ICON.stop)}<span class="lbl">STOP</span>` : `${icon(ICON.play)}<span class="lbl">PLAY</span>`;
     this.speedBtn.classList.toggle('active', fast);
+    this.speedBtn.querySelector('.x')!.textContent = fast ? '×2' : '×1';
     if (playing) this.hideBubble();
   }
 
@@ -166,8 +171,8 @@ export class Hud {
   }
 
   setSpeed(v: number): void {
-    this.speedBar.style.width = `${Math.min(100, (v / 6) * 100).toFixed(0)}%`;
-    this.speedTxt.textContent = `${v.toFixed(1)} m/s`;
+    const lit = Math.round(Math.min(1, v / 5.5) * this.cells.length);
+    this.cells.forEach((c, i) => c.classList.toggle('on', i < lit));
   }
 
   /** Floating controls next to the selected piece. */
