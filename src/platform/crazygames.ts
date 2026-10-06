@@ -86,8 +86,12 @@ export class CrazyGamesPlatform implements PlatformAdapter {
     });
   }
 
+  /**
+   * The "double Gears" rewarded button is Playgama-only: CrazyGames serves no
+   * ads during Basic Launch, so offering it here would only ever fail.
+   */
   get rewardedAvailable(): boolean {
-    return !!this.sdk;
+    return false;
   }
 
   showRewarded(_placement: string, pause: () => void, resume: () => void): Promise<boolean> {

@@ -63,7 +63,7 @@ npm run preview      # serve the production build
   purely cosmetic and never change the physics.
 - Every player starts with 0 Gears. Older saves get a one-time reset of the balance, but keep their
   stars and owned skins.
-- **Double with an ad:** on platforms with rewarded ads (Playgama, and CrazyGames), the level-complete
+- **Double with an ad:** on Playgama (which supports rewarded ads), the level-complete
   screen offers to double the Gears just earned. The reward is granted only after the ad finishes.
   Run `npm run dev` and open `?fakeads` to test the flow locally with a simulated ad.
 - The rules live in `src/meta/economy.ts` and the catalogue in `src/meta/skins.ts`. Both are covered by
