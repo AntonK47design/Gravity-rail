@@ -168,6 +168,16 @@ The adapters load the SDK with a timeout and fall back to a no-op local adapter 
 The core game never depends on an external service. Midgame ads are requested only at natural breaks
 (every third completed level), and audio is suspended while an ad plays.
 
+### Building for a portal
+
+```bash
+npm run build:crazygames   # → orbital-crazygames.zip (CrazyGames SDK v3 forced on)
+npm run build:playgama     # → orbital-playgama.zip   (Playgama Bridge forced on)
+```
+
+Each zip has `index.html` at its root and is ready to upload. On CrazyGames, open the developer portal,
+submit a new HTML5 game with the zip, then use their preview / QA tool to check the SDK events.
+
 ## Saving
 
 Progress is stored in `localStorage` (`orbital.save.v1`): unlocked levels (derived from completions),

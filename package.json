@@ -2,7 +2,7 @@
   "name": "orbital",
   "private": true,
   "version": "1.0.0",
-  "description": "ORBITAL — a 3D machine-building physics puzzle game for the browser.",
+  "description": "ORBITAL \u2014 a 3D machine-building physics puzzle game for the browser.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "verify-levels": "vitest run tests/levels.test.ts"
+    "verify-levels": "vitest run tests/levels.test.ts",
+    "build:crazygames": "tsc --noEmit && vite build --outDir dist-crazygames --mode crazygames && node scripts/zip.mjs dist-crazygames orbital-crazygames.zip",
+    "build:playgama": "tsc --noEmit && vite build --outDir dist-playgama --mode playgama && node scripts/zip.mjs dist-playgama orbital-playgama.zip"
   },
   "dependencies": {
     "three": "^0.186.1"
