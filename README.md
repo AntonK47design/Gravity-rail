@@ -22,6 +22,13 @@ npm run build        # production build in dist/
 npm run preview      # serve the production build
 ```
 
+## GitHub Pages
+
+`.github/workflows/deploy-pages.yml` tests, builds and publishes `dist/` to GitHub Pages on every push to
+`main` (or this development branch), and can also be run manually from the Actions tab. One-time setup:
+**Settings → Pages → Build and deployment → Source: GitHub Actions**. The game is then served at
+`https://<user>.github.io/<repo>/`. The build uses relative asset paths, so it works under any sub-path.
+
 ## Features
 
 - **30 handcrafted levels in 5 worlds**: Foundations, Momentum, Machines, Energy and Mastermind.
