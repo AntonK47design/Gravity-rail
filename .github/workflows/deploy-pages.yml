@@ -10,8 +10,10 @@ permissions:
   pages: write
   id-token: write
 
+# One queue per branch, so pushing the same commit to two branches doesn't
+# cancel the deploy from the branch GitHub Pages actually accepts.
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
