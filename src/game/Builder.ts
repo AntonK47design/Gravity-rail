@@ -38,6 +38,8 @@ export class Builder {
   private hoverNdc: THREE.Vector2 | null = null;
   private ray = new THREE.Raycaster();
   /** A placed piece being carried to a new spot (drag, or the Move button). */
+  /** Tool that was armed when a drag started; re-armed after the drop. */
+  private resumeTool: PieceType | null = null;
   moving: { id: number; from: Pose & { x: number; z: number }; drag: boolean } | null = null;
   readonly history = new History();
 
@@ -362,7 +364,8 @@ export class Builder {
 
   /** Can a drag starting here pick up a piece? (Build mode, no tool armed, on a player piece.) */
   canGrab(ndc: THREE.Vector2): boolean {
-    if (this.tool || this.moving) return false;
+    // Works even with a tool armed: pressing on a placed piece and dragging moves it.
+    if (this.moving) return false;
     const id = this.pickPiece(ndc);
     return id !== null && !this.board.pieces.get(id)!.fixed;
   }
@@ -376,6 +379,7 @@ export class Builder {
       this.fb.toast(ERROR_TEXT.fixed, 'bad');
       return;
     }
+    this.resumeTool = this.tool;
     this.select(null);
     this.tool = null;
     this.moving = { id: p.id, from: { x: p.x, z: p.z, level: p.level, rot: p.rot }, drag };
@@ -424,7 +428,21 @@ export class Builder {
       for (const port of c.ports) if (port.status === 'connected') this.fx.burst(port.pos, 0x4ade80, 6, 0.8, 0.08, 0.4);
       this.fb.sound('place');
     }
-    this.select(p.id);
+    this.finishMove(p.id);
+  }
+
+  /** After a move: re-arm the previous tool if there was one, else select the moved piece. */
+  private finishMove(id: number | null): void {
+    const tool = this.resumeTool;
+    this.resumeTool = null;
+    if (tool && this.left(tool) > 0) {
+      this.tool = tool;
+      this.selected = null;
+      this.view.select(null);
+      this.candCell = '';
+      this.fb.changed();
+      this.refreshHover();
+    } else this.select(id);
   }
 
   cancelMove(quiet = false): void {
@@ -434,7 +452,7 @@ export class Builder {
     this.view.setCarried(null);
     this.view.showGhost(null, null);
     if (!quiet) this.fb.sound('undo');
-    this.select(this.board.pieces.has(id) ? id : null);
+    this.finishMove(this.board.pieces.has(id) ? id : null);
   }
 
   flip(): void {
